@@ -10,7 +10,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn main_loop<T: SystemdConnection + Sized>(conn: T) -> Result<()> {
+fn main_loop<T: SystemdConnection>(conn: T) -> Result<()> {
     let unit_status = conn.list_units().context("could not list units")?;
     dbg!(unit_status);
     let unit_status = conn.list_units().context("could not list units")?;

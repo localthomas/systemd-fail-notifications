@@ -9,12 +9,14 @@ pub struct Connection {
     conn: zbus::Connection,
 }
 
-impl SystemdConnection for Connection {
-    fn new() -> Result<Self> {
+impl Connection {
+    pub fn new() -> Result<Self> {
         let conn = zbus::Connection::new_system().context("could not connect to system bus")?;
         Ok(Self { conn })
     }
+}
 
+impl SystemdConnection for Connection {
     fn list_units(&self) -> Result<Vec<UnitStatus>> {
         let message = self
             .conn
@@ -33,7 +35,7 @@ impl SystemdConnection for Connection {
     }
 }
 
-#[derive(Deserialize, Debug, Type)]
+#[derive(Deserialize, Debug, Type, Clone)]
 pub struct UnitStatus {
     name: String,
     description: String,

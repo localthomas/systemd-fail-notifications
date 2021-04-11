@@ -1,7 +1,7 @@
-pub mod connection;
+pub mod dbus;
 
 use anyhow::Result;
-use connection::UnitStatus;
+use dbus::UnitStatus;
 
 pub trait SystemdConnection {
     fn list_units(&self) -> Result<Vec<UnitStatus>>;

@@ -1,7 +1,7 @@
 mod dbus_systemd;
 
 use anyhow::{Context, Result};
-use dbus_systemd::connection::Connection;
+use dbus_systemd::dbus::Connection;
 use dbus_systemd::SystemdConnection;
 
 fn main() -> Result<()> {

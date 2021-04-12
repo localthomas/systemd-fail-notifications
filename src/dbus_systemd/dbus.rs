@@ -17,7 +17,7 @@ impl Connection {
 }
 
 impl SystemdConnection for Connection {
-    fn list_units(&self) -> Result<Vec<UnitStatus>> {
+    fn list_units(&self) -> Result<Vec<UnitStatusRaw>> {
         let message = self
             .conn
             .call_method(
@@ -28,7 +28,7 @@ impl SystemdConnection for Connection {
                 &(),
             )
             .context("could not make method call to ListUnits")?;
-        let unit_status: Vec<UnitStatus> = message
+        let unit_status: Vec<UnitStatusRaw> = message
             .body()
             .context("could not deserialize the message from dbus")?;
         Ok(unit_status)
@@ -36,7 +36,7 @@ impl SystemdConnection for Connection {
 }
 
 #[derive(Deserialize, Debug, Type, Clone)]
-pub struct UnitStatus {
+pub struct UnitStatusRaw {
     name: String,
     description: String,
     load_state: String,

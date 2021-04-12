@@ -1,10 +1,10 @@
 pub mod dbus;
 
 use anyhow::Result;
-use dbus::UnitStatus;
+use dbus::UnitStatusRaw;
 
 pub trait SystemdConnection {
-    fn list_units(&self) -> Result<Vec<UnitStatus>>;
+    fn list_units(&self) -> Result<Vec<UnitStatusRaw>>;
 }
 
 #[cfg(test)]
@@ -14,7 +14,7 @@ pub mod tests {
     use super::*;
 
     pub struct MockupSystemdConnection {
-        pub units: Vec<UnitStatus>,
+        pub units: Vec<UnitStatusRaw>,
         pub error: bool,
     }
 
@@ -28,7 +28,7 @@ pub mod tests {
     }
 
     impl SystemdConnection for MockupSystemdConnection {
-        fn list_units(&self) -> Result<Vec<UnitStatus>> {
+        fn list_units(&self) -> Result<Vec<UnitStatusRaw>> {
             if self.error {
                 Err(anyhow!("test"))
             } else {

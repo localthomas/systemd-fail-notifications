@@ -1,8 +1,37 @@
 mod dbus_systemd;
+mod status;
+
+use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use dbus_systemd::dbus::Connection;
 use dbus_systemd::SystemdConnection;
+use status::UnitStatus;
+
+#[derive(Debug)]
+struct AppState {
+    systemd_state: HashSet<UnitStatus>,
+    // TODO: add filter function as field
+}
+
+impl AppState {
+    fn new() -> Self {
+        Self {
+            systemd_state: HashSet::new(),
+        }
+    }
+
+    fn apply_new_status(&mut self, new_status: &[UnitStatus]) {
+        // TODO add filter field
+        // TODO check for changes
+        new_status
+            .into_iter()
+            .filter(|&status| status.name().ends_with(".service"))
+            .for_each(|status| {
+                self.systemd_state.insert(status.clone());
+            });
+    }
+}
 
 fn main() -> Result<()> {
     let conn = Connection::new().context("could not create connection")?;
@@ -11,12 +40,14 @@ fn main() -> Result<()> {
 }
 
 fn main_loop<T: SystemdConnection>(conn: T) -> Result<()> {
+    let mut state = AppState::new();
     let unit_status = conn.list_units().context("could not list units")?;
-    dbg!(unit_status);
-    let unit_status = conn.list_units().context("could not list units")?;
-    dbg!(unit_status);
+    let unit_status: Vec<UnitStatus> = unit_status.into_iter().map(UnitStatus::new).collect();
+    state.apply_new_status(&unit_status);
+    dbg!(state);
     Ok(())
 }
+
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;

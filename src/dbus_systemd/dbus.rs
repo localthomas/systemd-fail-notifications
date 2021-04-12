@@ -37,14 +37,14 @@ impl SystemdConnection for Connection {
 
 #[derive(Deserialize, Debug, Type, Clone)]
 pub struct UnitStatusRaw {
-    name: String,
-    description: String,
-    load_state: String,
-    active_state: String,
-    sub_state: String,
-    following_unit: String,
-    unit_object_path: OwnedObjectPath,
-    job_queued_id: u32,
-    job_type: String,
-    job_object_path: OwnedObjectPath,
+    pub name: String,
+    pub description: String,
+    pub load_state: String,
+    pub active_state: String,
+    pub sub_state: String,
+    pub following_unit: String,
+    pub unit_object_path: OwnedObjectPath,
+    pub job_queued_id: u32,
+    pub job_type: String,
+    pub job_object_path: OwnedObjectPath,
 }

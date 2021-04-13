@@ -28,10 +28,10 @@ impl SystemdConnection for Connection {
                 &(),
             )
             .context("could not make method call to ListUnits")?;
-        let unit_status: Vec<UnitStatusRaw> = message
+        let unit_status: Vec<UnitStatusInternal> = message
             .body()
             .context("could not deserialize the message from dbus")?;
-        Ok(unit_status)
+        Ok(unit_status.into_iter().map(UnitStatusRaw::from).collect())
     }
 }
 
@@ -43,8 +43,31 @@ pub struct UnitStatusRaw {
     pub active_state: String,
     pub sub_state: String,
     pub following_unit: String,
-    pub unit_object_path: OwnedObjectPath,
-    pub job_queued_id: u32,
-    pub job_type: String,
-    pub job_object_path: OwnedObjectPath,
+}
+
+impl From<UnitStatusInternal> for UnitStatusRaw {
+    fn from(status: UnitStatusInternal) -> Self {
+        Self {
+            name: status.name,
+            description: status.description,
+            load_state: status.load_state,
+            active_state: status.active_state,
+            sub_state: status.sub_state,
+            following_unit: status.following_unit,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Type, Clone)]
+struct UnitStatusInternal {
+    name: String,
+    description: String,
+    load_state: String,
+    active_state: String,
+    sub_state: String,
+    following_unit: String,
+    unit_object_path: OwnedObjectPath,
+    job_queued_id: u32,
+    job_type: String,
+    job_object_path: OwnedObjectPath,
 }

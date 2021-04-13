@@ -68,15 +68,6 @@ pub struct UnitStatus {
 }
 
 impl UnitStatus {
-    pub fn new(raw: UnitStatusRaw) -> Self {
-        Self {
-            name: raw.name,
-            description: raw.description,
-            load_state: LoadState::from_str(&raw.load_state).unwrap(),
-            active_state: ActiveState::from_str(&raw.active_state).unwrap(),
-        }
-    }
-
     /// Get a reference to the unit status's name.
     pub fn name(&self) -> &String {
         &self.name
@@ -90,5 +81,16 @@ impl UnitStatus {
     /// Get a reference to the unit status's load state.
     pub fn load_state(&self) -> &LoadState {
         &self.load_state
+    }
+}
+
+impl From<UnitStatusRaw> for UnitStatus {
+    fn from(raw: UnitStatusRaw) -> Self {
+        Self {
+            name: raw.name,
+            description: raw.description,
+            load_state: LoadState::from_str(&raw.load_state).unwrap(),
+            active_state: ActiveState::from_str(&raw.active_state).unwrap(),
+        }
     }
 }

@@ -1,4 +1,5 @@
 use crate::dbus_systemd::dbus::UnitStatusRaw;
+use std::str::FromStr;
 
 /// Generate a string based enum, i.e. one enum variant corresponds to one string value.
 /// Does not return an error on parsing, but instead implements a variant `Unknown`.
@@ -13,20 +14,18 @@ macro_rules! string_enum {
             Unknown(String),
         }
 
-        use std::fmt;
-        impl fmt::Display for $name {
-           fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        impl std::fmt::Display for $name {
+           fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "{}", match self {
                 $(
                     &$name::$item => String::from($repr),
                 )*
-                    LoadState::Unknown(string) => format!("unknown: {}", string),
+                    $name::Unknown(string) => format!("unknown: {}", string),
                 })
             }
         }
 
-        use std::str::FromStr;
-        impl FromStr for $name {
+        impl std::str::FromStr for $name {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
@@ -49,11 +48,23 @@ string_enum! {
     }
 }
 
+string_enum! {
+    ActiveState {
+        (Active, "active"),
+        (Reloading, "reloading"),
+        (Inactive, "inactive"),
+        (Failed, "failed"),
+        (Activating, "activating"),
+        (Deactivating, "deactivating"),
+    }
+}
+
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub struct UnitStatus {
     name: String,
     description: String,
     load_state: LoadState,
+    active_state: ActiveState,
 }
 
 impl UnitStatus {
@@ -62,6 +73,7 @@ impl UnitStatus {
             name: raw.name,
             description: raw.description,
             load_state: LoadState::from_str(&raw.load_state).unwrap(),
+            active_state: ActiveState::from_str(&raw.active_state).unwrap(),
         }
     }
 

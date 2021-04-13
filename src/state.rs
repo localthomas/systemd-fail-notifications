@@ -9,11 +9,11 @@ pub trait AppState {
 pub struct SystemdState<'a> {
     systemd_state: HashSet<UnitStatus>,
     // TODO: add filter function as field
-    on_state_changed: Box<dyn Fn(&[&UnitStatus]) + 'a>,
+    on_state_changed: Box<dyn FnMut(&[&UnitStatus]) + 'a>,
 }
 
 impl<'a> SystemdState<'a> {
-    pub fn new(on_state_changed: impl Fn(&[&UnitStatus]) + 'a) -> Self {
+    pub fn new(on_state_changed: impl FnMut(&[&UnitStatus]) + 'a) -> Self {
         Self {
             systemd_state: HashSet::new(),
             on_state_changed: Box::new(on_state_changed),
@@ -57,5 +57,54 @@ pub mod tests {
         fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) {
             self.last_state = Some(new_status);
         }
+    }
+
+    #[test]
+    fn on_state_changed_not_called_for_empty_new_state() {
+        let mut state = SystemdState::new(|_| panic!("should not be called"));
+        state.apply_new_status(vec![]);
+    }
+
+    #[test]
+    fn on_state_changed_called_for_new_state() {
+        let test_status = UnitStatus::from(crate::dbus_systemd::dbus::UnitStatusRaw {
+            name: String::from("name"),
+            description: String::from("desc"),
+            load_state: String::from("test"),
+            active_state: String::from("test"),
+            sub_state: String::from("test"),
+            following_unit: String::from("test"),
+        });
+        let mut counter = 0u32;
+        {
+            let mut state = SystemdState::new(|new_state| {
+                assert_eq!(new_state, vec![&test_status]);
+                counter += 1;
+            });
+            state.apply_new_status(vec![test_status.clone()]);
+        }
+        assert_eq!(counter, 1);
+    }
+
+    #[test]
+    fn on_state_changed_called_for_changing_state() {
+        let test_status = UnitStatus::from(crate::dbus_systemd::dbus::UnitStatusRaw {
+            name: String::from("name"),
+            description: String::from("desc"),
+            load_state: String::from("test"),
+            active_state: String::from("test"),
+            sub_state: String::from("test"),
+            following_unit: String::from("test"),
+        });
+        let mut counter = 0u32;
+        {
+            let mut state = SystemdState::new(|new_state| {
+                assert_eq!(new_state, vec![&test_status]);
+                counter += 1;
+            });
+            state.apply_new_status(vec![]);
+            state.apply_new_status(vec![test_status.clone()]);
+        }
+        assert_eq!(counter, 1);
     }
 }

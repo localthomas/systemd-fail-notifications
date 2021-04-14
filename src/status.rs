@@ -82,6 +82,11 @@ impl UnitStatus {
     pub fn load_state(&self) -> &LoadState {
         &self.load_state
     }
+
+    /// Get a reference to the unit status's active state.
+    pub fn active_state(&self) -> &ActiveState {
+        &self.active_state
+    }
 }
 
 impl From<UnitStatusRaw> for UnitStatus {

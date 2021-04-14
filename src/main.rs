@@ -1,4 +1,5 @@
 mod dbus_systemd;
+mod filter;
 mod state;
 mod status;
 
@@ -7,13 +8,20 @@ use std::thread;
 use anyhow::{Context, Result};
 use dbus_systemd::dbus::Connection;
 use dbus_systemd::SystemdConnection;
+use filter::FilterState;
 use state::{AppState, SystemdState};
 use status::UnitStatus;
 
 fn main() -> Result<()> {
+    let mut filter = FilterState::new();
     let conn = Connection::new().context("could not create connection")?;
     let mut state = SystemdState::new(|changes| {
-        println!("{:#?}", changes);
+        changes
+            .iter()
+            .filter(|status| filter.filter_function(status))
+            .for_each(|status| {
+                println!("{:#?}", status);
+            });
     });
     looping(move || main_loop(&conn, &mut state).context("error during main loop"))?;
     Ok(())

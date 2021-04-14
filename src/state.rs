@@ -8,7 +8,6 @@ pub trait AppState {
 
 pub struct SystemdState<'a> {
     systemd_state: HashSet<UnitStatus>,
-    // TODO: add filter function as field
     on_state_changed: Box<dyn FnMut(&[&UnitStatus]) + 'a>,
 }
 
@@ -23,14 +22,10 @@ impl<'a> SystemdState<'a> {
 
 impl<'a> AppState for SystemdState<'a> {
     fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) {
-        // TODO add filter field
         let mut new_state = HashSet::with_capacity(new_status.len());
-        new_status
-            .into_iter()
-            .filter(|status| status.name().ends_with(".service"))
-            .for_each(|status| {
-                new_state.insert(status);
-            });
+        new_status.into_iter().for_each(|status| {
+            new_state.insert(status);
+        });
         let changes: Vec<&UnitStatus> = new_state.difference(&self.systemd_state).collect();
         if changes.len() > 0 {
             (self.on_state_changed)(changes.as_slice());
@@ -104,6 +99,29 @@ pub mod tests {
             });
             state.apply_new_status(vec![]);
             state.apply_new_status(vec![test_status.clone()]);
+        }
+        assert_eq!(counter, 1);
+    }
+
+    #[test]
+    fn on_state_changed_note_called_for_smaller_state() {
+        let test_status = UnitStatus::from(crate::dbus_systemd::dbus::UnitStatusRaw {
+            name: String::from("name"),
+            description: String::from("desc"),
+            load_state: String::from("test"),
+            active_state: String::from("test"),
+            sub_state: String::from("test"),
+            following_unit: String::from("test"),
+        });
+        let mut counter = 0u32;
+        {
+            let mut state = SystemdState::new(|new_state| {
+                assert_eq!(new_state, vec![&test_status]);
+                counter += 1;
+            });
+            state.apply_new_status(vec![test_status.clone()]);
+            state.apply_new_status(vec![]);
+            state.apply_new_status(vec![]);
         }
         assert_eq!(counter, 1);
     }

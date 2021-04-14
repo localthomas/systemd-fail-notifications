@@ -3,7 +3,7 @@ mod filter;
 mod state;
 mod status;
 
-use std::thread;
+use std::{thread, time};
 
 use anyhow::{Context, Result};
 use dbus_systemd::dbus::Connection;
@@ -23,7 +23,9 @@ fn main() -> Result<()> {
                 println!("{:#?}", status);
             });
     });
-    looping(move || main_loop(&conn, &mut state).context("error during main loop"))?;
+    looping(time::Duration::from_millis(2_000), move || {
+        main_loop(&conn, &mut state).context("error during main loop")
+    })?;
     Ok(())
 }
 
@@ -34,11 +36,12 @@ fn main_loop<T: SystemdConnection>(conn: &T, state: &mut (dyn AppState)) -> Resu
     Ok(())
 }
 
-fn looping<T: FnMut() -> Result<()>>(mut function: T) -> Result<()> {
+fn looping<T: FnMut() -> Result<()>>(interval: time::Duration, mut function: T) -> Result<()> {
     loop {
+        let start = time::Instant::now();
         function()?;
-        // measure time and then sleep exact
-        thread::sleep(std::time::Duration::from_millis(1_000));
+        // measure time and then sleep exact so long that the interval is met
+        thread::sleep(interval - start.elapsed());
     }
 }
 

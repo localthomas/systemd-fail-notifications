@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 
-const DISCORD_WEBHOOK_URL: &str = "SYSTEMD_WEBHOOKS_DISCORD_WEBHOOK_URL";
+const DISCORD_WEBHOOK_URL: &str = "SYSTEMD_FAIL_NOTIFICATIONS_DISCORD_WEBHOOK_URL";
 
 pub struct Config {
     pub discord_webhook_url: Option<String>,

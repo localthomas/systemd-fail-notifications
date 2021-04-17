@@ -8,11 +8,11 @@ pub trait AppState {
 
 pub struct SystemdState<'a> {
     systemd_state: HashSet<UnitStatus>,
-    on_state_changed: Box<dyn FnMut(&[&UnitStatus]) + 'a>,
+    on_state_changed: Box<dyn FnMut(Vec<UnitStatus>) + 'a>,
 }
 
 impl<'a> SystemdState<'a> {
-    pub fn new(on_state_changed: impl FnMut(&[&UnitStatus]) + 'a) -> Self {
+    pub fn new(on_state_changed: impl FnMut(Vec<UnitStatus>) + 'a) -> Self {
         Self {
             systemd_state: HashSet::new(),
             on_state_changed: Box::new(on_state_changed),
@@ -26,9 +26,9 @@ impl<'a> AppState for SystemdState<'a> {
         new_status.into_iter().for_each(|status| {
             new_state.insert(status);
         });
-        let changes: Vec<&UnitStatus> = new_state.difference(&self.systemd_state).collect();
+        let changes: Vec<UnitStatus> = new_state.difference(&self.systemd_state).cloned().collect();
         if changes.len() > 0 {
-            (self.on_state_changed)(changes.as_slice());
+            (self.on_state_changed)(changes);
         }
         self.systemd_state = new_state;
     }
@@ -73,7 +73,7 @@ pub mod tests {
         let mut counter = 0u32;
         {
             let mut state = SystemdState::new(|new_state| {
-                assert_eq!(new_state, vec![&test_status]);
+                assert_eq!(new_state, vec![test_status.clone()]);
                 counter += 1;
             });
             state.apply_new_status(vec![test_status.clone()]);
@@ -94,7 +94,7 @@ pub mod tests {
         let mut counter = 0u32;
         {
             let mut state = SystemdState::new(|new_state| {
-                assert_eq!(new_state, vec![&test_status]);
+                assert_eq!(new_state, vec![test_status.clone()]);
                 counter += 1;
             });
             state.apply_new_status(vec![]);
@@ -116,7 +116,7 @@ pub mod tests {
         let mut counter = 0u32;
         {
             let mut state = SystemdState::new(|new_state| {
-                assert_eq!(new_state, vec![&test_status]);
+                assert_eq!(new_state, vec![test_status.clone()]);
                 counter += 1;
             });
             state.apply_new_status(vec![test_status.clone()]);

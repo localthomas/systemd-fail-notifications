@@ -1,11 +1,14 @@
+mod config;
 mod dbus_systemd;
 mod filter;
+mod notifications;
 mod state;
 mod status;
 
 use std::{thread, time};
 
 use anyhow::{Context, Result};
+use config::Config;
 use dbus_systemd::dbus::Connection;
 use dbus_systemd::SystemdConnection;
 use filter::FilterState;
@@ -15,13 +18,43 @@ use status::UnitStatus;
 fn main() -> Result<()> {
     let mut filter = FilterState::new();
     let conn = Connection::new().context("could not create connection")?;
+    let conf = Config::new().context("could not create configuration")?;
+    let mut notifications = notifications::create_notifications(&conf)
+        .context("could not create notifications provider")?;
+
     let mut state = SystemdState::new(|changes| {
-        changes
+        let filtered: Vec<UnitStatus> = changes
             .iter()
+            .cloned()
             .filter(|status| filter.filter_function(status))
-            .for_each(|status| {
-                println!("{:#?}", status);
-            });
+            .collect();
+        if filtered.len() == 0 {
+            return;
+        }
+
+        for service in &filtered {
+            println!(
+                "{} has changed states. Executing webhooks...",
+                service.name()
+            );
+        }
+
+        let notification_errors: Vec<anyhow::Error> = notifications
+            .iter_mut()
+            // TODO: execute notification in separate threads
+            .map(|notification| notification.execute(filtered.clone()))
+            .filter_map(|result| {
+                if let Err(error) = result {
+                    Some(error)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for error in notification_errors {
+            // TODO: send notifications for errors occurring during notification sending
+            println!("Error during notification: {:?}", error);
+        }
     });
     looping(time::Duration::from_millis(2_000), move || {
         main_loop(&conn, &mut state).context("error during main loop")

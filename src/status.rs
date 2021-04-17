@@ -65,6 +65,7 @@ pub struct UnitStatus {
     description: String,
     load_state: LoadState,
     active_state: ActiveState,
+    sub_state: String,
 }
 
 impl UnitStatus {
@@ -87,6 +88,11 @@ impl UnitStatus {
     pub fn active_state(&self) -> &ActiveState {
         &self.active_state
     }
+
+    /// Get a reference to the unit status's sub state.
+    pub fn sub_state(&self) -> &String {
+        &self.sub_state
+    }
 }
 
 impl From<UnitStatusRaw> for UnitStatus {
@@ -96,6 +102,7 @@ impl From<UnitStatusRaw> for UnitStatus {
             description: raw.description,
             load_state: LoadState::from_str(&raw.load_state).unwrap(),
             active_state: ActiveState::from_str(&raw.active_state).unwrap(),
+            sub_state: raw.sub_state,
         }
     }
 }

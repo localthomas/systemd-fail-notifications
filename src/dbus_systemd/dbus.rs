@@ -11,7 +11,10 @@ pub struct Connection {
 
 impl Connection {
     pub fn new() -> Result<Self> {
-        let conn = zbus::Connection::new_system().context("could not connect to system bus")?;
+        let conn = zbus::Connection::new_system().context(format!(
+            "could not connect to system bus at {}",
+            dbus_system_address()
+        ))?;
         Ok(Self { conn })
     }
 }
@@ -32,6 +35,13 @@ impl SystemdConnection for Connection {
             .body()
             .context("could not deserialize the message from dbus")?;
         Ok(unit_status.into_iter().map(UnitStatusRaw::from).collect())
+    }
+}
+
+fn dbus_system_address() -> String {
+    match std::env::var("DBUS_SYSTEM_BUS_ADDRESS") {
+        Ok(val) => val,
+        _ => "/var/run/dbus/system_bus_socket".to_string(),
     }
 }
 

@@ -1,11 +1,11 @@
 [package]
-name = "systemd-webhooks"
+name = "systemd-fail-notifications"
 version = "0.1.0"
 authors = ["Thomas <none>"]
 edition = "2018"
 
 [[bin]]
-name = "systemd-webhooks"
+name = "systemd-fail-notifications"
 path = "src/main.rs"
 
 [dependencies]

@@ -28,7 +28,7 @@ impl Discord {
             "embeds": [
                 {
                     "author": {
-                        "name": "systemd-webhooks",
+                        "name": "systemd-fail-notifications",
                     },
                     "title": format!("{} has failed!", status.name()),
                     "description": "The following unit has entered a new state:",

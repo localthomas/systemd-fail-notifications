@@ -14,5 +14,5 @@ RUN cargo build --target x86_64-unknown-linux-musl --release
 # --- bundle stage ---
 FROM scratch
 WORKDIR /
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/systemd-webhooks .
-CMD ["/systemd-webhooks"]
+COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/systemd-fail-notifications .
+CMD ["/systemd-fail-notifications"]

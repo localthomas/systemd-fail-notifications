@@ -8,6 +8,7 @@ mod status;
 use std::{thread, time};
 
 use anyhow::{Context, Result};
+use clap::Clap;
 use config::Config;
 use dbus_systemd::dbus::Connection;
 use dbus_systemd::SystemdConnection;
@@ -15,7 +16,26 @@ use filter::FilterState;
 use state::{AppState, SystemdState};
 use status::UnitStatus;
 
+/// systemd-fail-notifications is a standalone binary that listens on the system bus and
+/// talks to systemd to identify failed units.
+/// Any configuration is done using environment variables.
+#[derive(Clap)]
+#[clap(version = env!("CARGO_PKG_VERSION"))]
+struct Options {
+    /// if set, print the licensing information as HTML and exit
+    #[clap(short, long)]
+    about: bool,
+}
+
 fn main() -> Result<()> {
+    let opts: Options = Options::parse();
+
+    if opts.about {
+        let about = include_str!("../license.html");
+        println!("{}", about);
+        return Ok(());
+    }
+
     let mut filter = FilterState::new();
     let conn = Connection::new().context("could not create connection")?;
     let conf = Config::new().context("could not create configuration")?;

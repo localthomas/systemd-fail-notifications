@@ -1,1 +1,4 @@
 /target
+
+# ignore automatically created license file
+license.html

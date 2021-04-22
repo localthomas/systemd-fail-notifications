@@ -1,7 +1,11 @@
 [package]
 name = "systemd-fail-notifications"
 version = "0.1.0"
-authors = ["Thomas <none>"]
+authors = ["localthomas"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/localthomas/systemd-fail-notifications"
+readme = "README.md"
+description = "This is a standalone binary that listens on the system bus and talks to systemd to identify failed units."
 edition = "2018"
 
 [[bin]]

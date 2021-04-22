@@ -17,6 +17,8 @@ RUN cargo build --target x86_64-unknown-linux-musl --release
 
 # --- bundle stage ---
 FROM scratch
+LABEL org.opencontainers.image.source="https://github.com/localthomas/systemd-fail-notifications"
+LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 WORKDIR /
 COPY --from=builder /systemd-fail-notifications/target/x86_64-unknown-linux-musl/release/systemd-fail-notifications .
 ENTRYPOINT ["/systemd-fail-notifications"]

@@ -1,3 +1,9 @@
+/*
+SPDX-FileCopyrightText: 2021 localthomas
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+*/
+
 mod config;
 mod dbus_systemd;
 mod filter;

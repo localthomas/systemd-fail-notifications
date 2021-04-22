@@ -1,3 +1,9 @@
+/*
+SPDX-FileCopyrightText: 2021 localthomas
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+*/
+
 use crate::dbus_systemd::dbus::UnitStatusRaw;
 use std::str::FromStr;
 

@@ -55,6 +55,10 @@ Enable the service file by running `systemctl enable /path/to/systemd-fail-notif
 | ---- | ------ | ----------- |
 | `SYSTEMD_FAIL_NOTIFICATIONS_DISCORD_WEBHOOK_URL` | `https://discord.com/api/webhooks/<id>/<token>` | [Discord webhook URL](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) |
 
+## Development
+
+To build the third-party license information, the [cargo-about](https://github.com/EmbarkStudios/cargo-about) cargo plugin is required.
+
 #### License
 
 This repository aims to be compliant with the [REUSE specification 3.0](https://reuse.software/spec/).

@@ -27,7 +27,7 @@ docker run \
 
 ### Static Binary
 
-Download the static binary from the [releases page](/localthomas/systemd-fail-notifications/releases).
+Download the static binary from the [releases page](https://github.com/localthomas/systemd-fail-notifications/releases).
 
 Create a service file (e.g. `systemd-fail-notifications.service`):
 

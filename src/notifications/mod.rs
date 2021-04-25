@@ -13,8 +13,11 @@ pub mod discord;
 
 pub trait NotificationProvider {
     // TODO: allow multiple Results?
-    fn execute(&mut self, states: Vec<UnitStatus>) -> Result<()>;
-    fn execute_error(&mut self, error: &anyhow::Error) -> Result<()>;
+    fn execute(&self, states: Vec<UnitStatus>) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send>;
+    fn execute_error(
+        &self,
+        error: &anyhow::Error,
+    ) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send>;
 }
 
 pub fn create_notifications(config: &Config) -> Result<Vec<Box<dyn NotificationProvider>>> {

@@ -8,35 +8,31 @@ use std::collections::HashSet;
 
 use crate::status::UnitStatus;
 
-pub trait AppState {
-    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>);
+pub trait SystemdState {
+    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<UnitStatus>;
 }
 
-pub struct SystemdState<'a> {
+pub struct SystemdStateImpl {
     systemd_state: HashSet<UnitStatus>,
-    on_state_changed: Box<dyn FnMut(Vec<UnitStatus>) + 'a>,
 }
 
-impl<'a> SystemdState<'a> {
-    pub fn new(on_state_changed: impl FnMut(Vec<UnitStatus>) + 'a) -> Self {
+impl SystemdStateImpl {
+    pub fn new() -> Self {
         Self {
             systemd_state: HashSet::new(),
-            on_state_changed: Box::new(on_state_changed),
         }
     }
 }
 
-impl<'a> AppState for SystemdState<'a> {
-    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) {
+impl<'a> SystemdState for SystemdStateImpl {
+    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<UnitStatus> {
         let mut new_state = HashSet::with_capacity(new_status.len());
         new_status.into_iter().for_each(|status| {
             new_state.insert(status);
         });
         let changes: Vec<UnitStatus> = new_state.difference(&self.systemd_state).cloned().collect();
-        if changes.len() > 0 {
-            (self.on_state_changed)(changes);
-        }
         self.systemd_state = new_state;
+        changes
     }
 }
 
@@ -44,26 +40,28 @@ impl<'a> AppState for SystemdState<'a> {
 pub mod tests {
     use super::*;
 
-    pub struct MockupAppState {
+    pub struct MockupSystemdState {
         pub last_state: Option<Vec<UnitStatus>>,
     }
 
-    impl MockupAppState {
+    impl MockupSystemdState {
         pub fn new() -> Self {
             Self { last_state: None }
         }
     }
 
-    impl AppState for MockupAppState {
-        fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) {
-            self.last_state = Some(new_status);
+    impl SystemdState for MockupSystemdState {
+        fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<UnitStatus> {
+            self.last_state = Some(new_status.clone());
+            new_status
         }
     }
 
     #[test]
     fn on_state_changed_not_called_for_empty_new_state() {
-        let mut state = SystemdState::new(|_| panic!("should not be called"));
-        state.apply_new_status(vec![]);
+        let mut state = SystemdStateImpl::new();
+        let changes = state.apply_new_status(vec![]);
+        assert_eq!(changes, vec![]);
     }
 
     #[test]
@@ -76,15 +74,11 @@ pub mod tests {
             sub_state: String::from("test"),
             following_unit: String::from("test"),
         });
-        let mut counter = 0u32;
-        {
-            let mut state = SystemdState::new(|new_state| {
-                assert_eq!(new_state, vec![test_status.clone()]);
-                counter += 1;
-            });
-            state.apply_new_status(vec![test_status.clone()]);
-        }
-        assert_eq!(counter, 1);
+        let mut state = SystemdStateImpl::new();
+        assert_eq!(
+            state.apply_new_status(vec![test_status.clone()]),
+            vec![test_status.clone()]
+        );
     }
 
     #[test]
@@ -97,16 +91,12 @@ pub mod tests {
             sub_state: String::from("test"),
             following_unit: String::from("test"),
         });
-        let mut counter = 0u32;
-        {
-            let mut state = SystemdState::new(|new_state| {
-                assert_eq!(new_state, vec![test_status.clone()]);
-                counter += 1;
-            });
-            state.apply_new_status(vec![]);
-            state.apply_new_status(vec![test_status.clone()]);
-        }
-        assert_eq!(counter, 1);
+        let mut state = SystemdStateImpl::new();
+        assert_eq!(state.apply_new_status(vec![]), vec![]);
+        assert_eq!(
+            state.apply_new_status(vec![test_status.clone()]),
+            vec![test_status.clone()]
+        );
     }
 
     #[test]
@@ -119,16 +109,12 @@ pub mod tests {
             sub_state: String::from("test"),
             following_unit: String::from("test"),
         });
-        let mut counter = 0u32;
-        {
-            let mut state = SystemdState::new(|new_state| {
-                assert_eq!(new_state, vec![test_status.clone()]);
-                counter += 1;
-            });
-            state.apply_new_status(vec![test_status.clone()]);
-            state.apply_new_status(vec![]);
-            state.apply_new_status(vec![]);
-        }
-        assert_eq!(counter, 1);
+        let mut state = SystemdStateImpl::new();
+        assert_eq!(
+            state.apply_new_status(vec![test_status.clone()]),
+            vec![test_status.clone()]
+        );
+        assert_eq!(state.apply_new_status(vec![]), vec![]);
+        assert_eq!(state.apply_new_status(vec![]), vec![]);
     }
 }

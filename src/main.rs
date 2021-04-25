@@ -19,7 +19,8 @@ use config::Config;
 use dbus_systemd::dbus::Connection;
 use dbus_systemd::SystemdConnection;
 use filter::FilterState;
-use state::{AppState, SystemdState};
+use notifications::NotificationProvider;
+use state::{SystemdState, SystemdStateImpl};
 use status::UnitStatus;
 
 /// systemd-fail-notifications is a standalone binary that listens on the system bus and
@@ -33,6 +34,88 @@ struct Options {
     about: bool,
 }
 
+struct AppState<'a, C, S>
+where
+    C: SystemdConnection,
+    S: SystemdState,
+{
+    filter: FilterState<'a>,
+    conn: C,
+    notifications: Vec<Box<dyn NotificationProvider>>,
+    systemd: S,
+}
+
+impl<'a, C, S> AppState<'a, C, S>
+where
+    C: SystemdConnection,
+    S: SystemdState,
+{
+    fn poll_for_new_systemd_state(&mut self) -> Result<Vec<UnitStatus>> {
+        let unit_status = self.conn.list_units().context("could not list units")?;
+        let unit_status: Vec<UnitStatus> = unit_status.into_iter().map(UnitStatus::from).collect();
+        let changes = self.systemd.apply_new_status(unit_status);
+        let filtered: Vec<UnitStatus> = changes
+            .iter()
+            .cloned()
+            .filter(|status| self.filter.filter_function(status))
+            .collect();
+        Ok(filtered)
+    }
+
+    fn notify(&self, status: Vec<UnitStatus>) {
+        for service in &status {
+            println!(
+                "{} has changed states. Executing webhooks...",
+                service.name()
+            );
+        }
+
+        let mut errors = Vec::new();
+        for notification in &self.notifications {
+            let func = notification.execute(status.clone());
+            // TODO: execute notification in separate threads; e.g. via a channel that is read in a thread created by a NotificationProvider
+            match func() {
+                Err(error) => {
+                    eprintln!("Error during notification: {:?}", error);
+                    errors.push(error);
+                }
+                Ok(_) => (),
+            }
+        }
+
+        for error in errors {
+            for notification in &self.notifications {
+                let func = notification.execute_error(&error);
+                // TODO: execute notification in separate threads
+                match func() {
+                    Err(error) => {
+                        eprintln!(
+                            "Error during notification for error during notification: {:?}",
+                            error
+                        );
+                    }
+                    Ok(_) => (),
+                }
+            }
+        }
+    }
+}
+
+fn initialize<'a>() -> Result<AppState<'a, Connection, SystemdStateImpl>> {
+    let filter = FilterState::new();
+    let conn = Connection::new().context("could not create connection")?;
+    let conf = Config::new().context("could not create configuration")?;
+    let notifications = notifications::create_notifications(&conf)
+        .context("could not create notifications provider")?;
+    let systemd = SystemdStateImpl::new();
+    Ok(AppState {
+        filter,
+        conn,
+        notifications,
+        systemd,
+    })
+}
+
 fn main() -> Result<()> {
     let opts: Options = Options::parse();
 
@@ -42,74 +125,29 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let mut filter = FilterState::new();
-    let conn = Connection::new().context("could not create connection")?;
-    let conf = Config::new().context("could not create configuration")?;
-    let mut notifications = notifications::create_notifications(&conf)
-        .context("could not create notifications provider")?;
+    let mut state = initialize()?;
 
-    let mut state = SystemdState::new(|changes| {
-        let filtered: Vec<UnitStatus> = changes
-            .iter()
-            .cloned()
-            .filter(|status| filter.filter_function(status))
-            .collect();
-        if filtered.len() == 0 {
-            return;
-        }
-
-        for service in &filtered {
-            println!(
-                "{} has changed states. Executing webhooks...",
-                service.name()
-            );
-        }
-
-        let notification_errors: Vec<anyhow::Error> = notifications
-            .iter_mut()
-            // TODO: execute notification in separate threads
-            .map(|notification| notification.execute(filtered.clone()))
-            .filter_map(|result| {
-                if let Err(error) = result {
-                    Some(error)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        for error in notification_errors {
-            eprintln!("Error during notification: {:?}", error);
-
-            // send notifications for the errors that occurred during execution of previous notifications
-            notifications
-                .iter_mut()
-                // TODO: execute notification in separate threads
-                .map(|notification| notification.execute_error(&error))
-                .filter_map(|result| {
-                    if let Err(error) = result {
-                        Some(error)
-                    } else {
-                        None
-                    }
-                })
-                .for_each(|error_sending| {
-                    eprintln!(
-                        "Error during notification for error during notification: {:?}",
-                        error_sending
-                    )
-                });
-        }
-    });
     looping(time::Duration::from_millis(2_000), move || {
-        main_loop(&conn, &mut state).context("error during main loop")
+        main_loop(&mut state).context("error during main loop")
     })?;
     Ok(())
 }
 
-fn main_loop<T: SystemdConnection>(conn: &T, state: &mut (dyn AppState)) -> Result<()> {
+fn main_loop<C, S>(state: &mut AppState<'_, C, S>) -> Result<()>
+where
+    C: SystemdConnection,
+    S: SystemdState,
+{
+    let status = state
+        .poll_for_new_systemd_state()
+        .context("could not poll for new systemd state")?;
+    state.notify(status);
+    /*
     let unit_status = conn.list_units().context("could not list units")?;
     let unit_status: Vec<UnitStatus> = unit_status.into_iter().map(UnitStatus::from).collect();
-    state.apply_new_status(unit_status);
+    let changes = state.apply_new_status(unit_status);
+    on_changes(changes);
+    */
     Ok(())
 }
 
@@ -127,17 +165,21 @@ mod tests {
     use anyhow::anyhow;
     use dbus_systemd::{dbus::UnitStatusRaw, tests::MockupSystemdConnection};
 
-    use crate::state::tests::MockupAppState;
+    use crate::state::tests::MockupSystemdState;
 
     use super::*;
 
     #[test]
     fn main_loop_return_on_error() {
-        let mut conn = MockupSystemdConnection::new();
-        conn.error = true;
-        let mut state = MockupAppState::new();
-        let result = main_loop(&conn, &mut state);
-        assert_eq!(state.last_state, None);
+        let mut state = AppState {
+            filter: FilterState::new(),
+            conn: MockupSystemdConnection::new(),
+            notifications: vec![],
+            systemd: MockupSystemdState::new(),
+        };
+        state.conn.error = true;
+        let result = main_loop(&mut state);
+        assert_eq!(state.systemd.last_state, None);
         if let Err(err) = result {
             assert_eq!(err.root_cause().to_string(), anyhow!("test").to_string());
         } else {
@@ -147,18 +189,21 @@ mod tests {
 
     #[test]
     fn main_loop_new_empty_status_from_connection() {
-        let mut conn = MockupSystemdConnection::new();
-        conn.units = vec![];
-        let mut state = MockupAppState::new();
-        assert_eq!(state.last_state, None);
-        main_loop(&conn, &mut state).expect("should not throw error");
-        assert_eq!(state.last_state, Some(Vec::new()));
+        let mut state = AppState {
+            filter: FilterState::new(),
+            conn: MockupSystemdConnection::new(),
+            notifications: vec![],
+            systemd: MockupSystemdState::new(),
+        };
+        state.conn.units = vec![];
+        assert_eq!(state.systemd.last_state, None);
+        main_loop(&mut state).expect("should not throw error");
+        assert_eq!(state.systemd.last_state, Some(Vec::new()));
     }
 
     #[test]
     fn main_loop_new_status_from_connection() {
         const TEST: &str = "test";
-        let mut conn = MockupSystemdConnection::new();
         let raw_unit = UnitStatusRaw {
             name: String::from(TEST),
             description: String::from(TEST),
@@ -167,12 +212,17 @@ mod tests {
             sub_state: String::from(TEST),
             following_unit: String::from(TEST),
         };
-        conn.units = vec![raw_unit.clone()];
-        let mut state = MockupAppState::new();
-        assert_eq!(state.last_state, None);
-        main_loop(&conn, &mut state).expect("should not throw error");
+        let mut state = AppState {
+            filter: FilterState::new(),
+            conn: MockupSystemdConnection::new(),
+            notifications: vec![],
+            systemd: MockupSystemdState::new(),
+        };
+        state.conn.units = vec![raw_unit.clone()];
+        assert_eq!(state.systemd.last_state, None);
+        main_loop(&mut state).expect("should not throw error");
         assert_eq!(
-            state.last_state,
+            state.systemd.last_state,
             Some(vec![UnitStatus::from(raw_unit.clone())])
         );
     }

@@ -66,23 +66,31 @@ impl Discord {
 }
 
 impl NotificationProvider for Discord {
-    fn execute(&mut self, states: Vec<UnitStatus>) -> Result<()> {
-        for status in states {
-            self.send_status(&status)?;
-        }
-        Ok(())
+    fn execute(&self, states: Vec<UnitStatus>) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send> {
+        Box::new(move || {
+            for status in &states {
+                self.send_status(&status)?;
+            }
+            Ok(())
+        })
     }
 
-    fn execute_error(&mut self, error: &anyhow::Error) -> Result<()> {
-        let payload = DiscordMessage {
-            content: "systemd-fail-notifications internal error!".to_string(),
-            title: "Internal Error!".to_string(),
-            description: format!("{:?}", error),
-            color: 13631488,
-            fields: vec![],
-        }
-        .to_json();
-        self.send(payload)
+    fn execute_error(
+        &self,
+        error: &anyhow::Error,
+    ) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send> {
+        let description = format!("{:?}", error);
+        Box::new(move || {
+            let payload = DiscordMessage {
+                content: "systemd-fail-notifications internal error!".to_string(),
+                title: "Internal Error!".to_string(),
+                description: description.clone(),
+                color: 13631488,
+                fields: vec![],
+            }
+            .to_json();
+            self.send(payload)
+        })
     }
 }
 

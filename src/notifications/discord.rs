@@ -5,8 +5,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 */
 
 use anyhow::{anyhow, Context, Result};
-use reqwest::Url;
 use serde_json::json;
+use url::Url;
 
 use crate::status::UnitStatus;
 
@@ -74,15 +74,18 @@ impl Discord {
             ],
         });
 
-        let client = reqwest::blocking::Client::new();
-        let res = client
-            .post(self.webhook_url.clone())
-            .query(&[("wait", "true")])
-            .json(&json_value)
-            .timeout(std::time::Duration::from_secs(15))
-            .send()
+        let timeout_duration = std::time::Duration::from_secs(15);
+        let agent = ureq::AgentBuilder::new()
+            .timeout_read(timeout_duration)
+            .timeout_write(timeout_duration)
+            .build();
+
+        let res = agent
+            .request_url("POST", &self.webhook_url)
+            .query("wait", "true")
+            .send_json(json_value)
             .context("could not execute POST on discord webhook")?;
-        if !res.status().is_success() {
+        if res.status() < 200 || res.status() > 299 {
             return Err(anyhow!(
                 "discord webhook POST request had not-ok status code: {}",
                 res.status()

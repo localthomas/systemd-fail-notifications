@@ -18,5 +18,6 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 anyhow = "1.0.40"
 serde_json = "1.0.64"
 chrono = "0.4.19"
-reqwest = { version = "0.11.3", default-features = false, features = ["blocking", "json", "rustls-tls"] }
-clap = "3.0.0-beta.2"
+ureq = { version = "2.1.0", features = ["json"] }
+url = "2.2.1"
+clap = { version = "3.0.0-beta.2", default-features = false, features = ["std", "derive"] }

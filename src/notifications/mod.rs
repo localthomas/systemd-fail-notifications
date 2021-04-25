@@ -14,6 +14,7 @@ pub mod discord;
 pub trait NotificationProvider {
     // TODO: allow multiple Results?
     fn execute(&mut self, states: Vec<UnitStatus>) -> Result<()>;
+    fn execute_error(&mut self, error: &anyhow::Error) -> Result<()>;
 }
 
 pub fn create_notifications(config: &Config) -> Result<Vec<Box<dyn NotificationProvider>>> {
@@ -29,4 +30,32 @@ pub fn create_notifications(config: &Config) -> Result<Vec<Box<dyn NotificationP
         ));
     }
     Ok(notifications)
+}
+
+fn http_post(
+    url: &url::Url,
+    query_params: Vec<(&str, &str)>,
+    payload: serde_json::Value,
+) -> Result<()> {
+    let timeout_duration = std::time::Duration::from_secs(15);
+    let agent = ureq::AgentBuilder::new()
+        .timeout_read(timeout_duration)
+        .timeout_write(timeout_duration)
+        .build();
+
+    let mut request = agent.request_url("POST", url);
+    for query_param in query_params {
+        request = request.query(query_param.0, query_param.1);
+    }
+
+    let response = request
+        .send_json(payload)
+        .context("could not execute POST on HTTP request")?;
+    if response.status() < 200 || response.status() > 299 {
+        return Err(anyhow!(
+            "HTTP POST request had not-ok status code: {}",
+            response.status()
+        ));
+    }
+    Ok(())
 }

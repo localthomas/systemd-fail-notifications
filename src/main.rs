@@ -78,8 +78,26 @@ fn main() -> Result<()> {
             })
             .collect();
         for error in notification_errors {
-            // TODO: send notifications for errors occurring during notification sending
-            println!("Error during notification: {:?}", error);
+            eprintln!("Error during notification: {:?}", error);
+
+            // send notifications for the errors that occurred during execution of previous notifications
+            notifications
+                .iter_mut()
+                // TODO: execute notification in separate threads
+                .map(|notification| notification.execute_error(&error))
+                .filter_map(|result| {
+                    if let Err(error) = result {
+                        Some(error)
+                    } else {
+                        None
+                    }
+                })
+                .for_each(|error_sending| {
+                    eprintln!(
+                        "Error during notification for error during notification: {:?}",
+                        error_sending
+                    )
+                });
         }
     });
     looping(time::Duration::from_millis(2_000), move || {

@@ -11,7 +11,7 @@ mod notifications;
 mod state;
 mod status;
 
-use std::{thread, time};
+use std::{sync::Arc, thread, time};
 
 use anyhow::{Context, Result};
 use clap::Clap;
@@ -34,6 +34,9 @@ struct Options {
     about: bool,
 }
 
+/// Holds the 'global' app internal state of the major sub-components.
+/// This includes the D-Bus connection to systemd, the notification providers and the app-local
+/// mirror of the state of systemd.
 struct AppState<'a, C, S>
 where
     C: SystemdConnection,
@@ -41,7 +44,7 @@ where
 {
     filter: FilterState<'a>,
     conn: C,
-    notifications: Vec<Box<dyn NotificationProvider>>,
+    notifications: Arc<Vec<Box<dyn NotificationProvider>>>,
     systemd: S,
 }
 
@@ -50,6 +53,9 @@ where
     C: SystemdConnection,
     S: SystemdState,
 {
+    /// Poll the system bus for new changes on the systemd daemon.
+    /// The response includes all units of the current state and this function only returns the filtered
+    /// unit status and only if they changed from the previous call to this function (hence the `&mut`).
     fn poll_for_new_systemd_state(&mut self) -> Result<Vec<UnitStatus>> {
         let unit_status = self.conn.list_units().context("could not list units")?;
         let unit_status: Vec<UnitStatus> = unit_status.into_iter().map(UnitStatus::from).collect();
@@ -62,6 +68,12 @@ where
         Ok(filtered)
     }
 
+    /// Execute notifications for the given status array that holds all relevant changes of units
+    /// which the user is notified by all notification providers.
+    ///
+    /// Any errors during initial notification of the changed services are then also broadcasted by
+    /// executing the error-notification of all notification providers.
+    /// An error on one notification provider is send to all notification providers' error-notifies.
     fn notify(&self, status: Vec<UnitStatus>) {
         for service in &status {
             println!(
@@ -70,37 +82,43 @@ where
             );
         }
 
-        let mut errors = Vec::new();
-        for notification in &self.notifications {
+        // execute for each notification provider the provided function that executes the notification
+        // in a separate thread to prevent blocking the process in case of errors
+        for notification in &*self.notifications {
             let func = notification.execute(status.clone());
-            // TODO: execute notification in separate threads; e.g. via a channel that is read in a thread created by a NotificationProvider
-            match func() {
+
+            // clone the atomic reference for each thread that is spawned
+            let notifications = self.notifications.clone();
+            std::thread::spawn(move || match func() {
+                // if an error occurs during the execution of the notification function,
+                // execute a notification for the error itself
                 Err(error) => {
                     eprintln!("Error during notification: {:?}", error);
-                    errors.push(error);
+                    for notification in &*notifications {
+                        let func = notification.execute_error(&error);
+                        // execute notification for error in separate thread
+                        std::thread::spawn(move || match func() {
+                            Err(error) => {
+                                eprintln!(
+                                    "Error during notification for error during notification: {:?}",
+                                    error
+                                );
+                            }
+                            Ok(_) => (),
+                        });
+                    }
                 }
                 Ok(_) => (),
-            }
-        }
-
-        for error in errors {
-            for notification in &self.notifications {
-                let func = notification.execute_error(&error);
-                // TODO: execute notification in separate threads
-                match func() {
-                    Err(error) => {
-                        eprintln!(
-                            "Error during notification for error during notification: {:?}",
-                            error
-                        );
-                    }
-                    Ok(_) => (),
-                }
-            }
+            });
         }
     }
 }
 
+/// Initialize an AppState for specific implementations that are only suitable when executed on a machine
+/// with systemd available.
+/// Notable side-effect: Uses environment variables to read the configuration.
+///
+/// Not usable for unit tests, unless the presence of systemd can be verified.
 fn initialize<'a>() -> Result<AppState<'a, Connection, SystemdStateImpl>> {
     let filter = FilterState::new();
     let conn = Connection::new().context("could not create connection")?;
@@ -111,7 +129,7 @@ fn initialize<'a>() -> Result<AppState<'a, Connection, SystemdStateImpl>> {
     Ok(AppState {
         filter,
         conn,
-        notifications,
+        notifications: Arc::new(notifications),
         systemd,
     })
 }
@@ -133,6 +151,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Execute the typical workload for this daemon program for one iteration.
+/// Designed to be periodically executed.
 fn main_loop<C, S>(state: &mut AppState<'_, C, S>) -> Result<()>
 where
     C: SystemdConnection,
@@ -142,15 +162,14 @@ where
         .poll_for_new_systemd_state()
         .context("could not poll for new systemd state")?;
     state.notify(status);
-    /*
-    let unit_status = conn.list_units().context("could not list units")?;
-    let unit_status: Vec<UnitStatus> = unit_status.into_iter().map(UnitStatus::from).collect();
-    let changes = state.apply_new_status(unit_status);
-    on_changes(changes);
-    */
     Ok(())
 }
 
+/// Provides a timed loop, where each iteration is executed in the specified interval.
+/// If the execution of the function in an iteration is taking longer than the specified interval
+/// the next iteration follows promptly.
+///
+/// The endless loop is stopped on receiving an error from the iteration function.
 fn looping<T: FnMut() -> Result<()>>(interval: time::Duration, mut function: T) -> Result<()> {
     loop {
         let start = time::Instant::now();
@@ -174,7 +193,7 @@ mod tests {
         let mut state = AppState {
             filter: FilterState::new(),
             conn: MockupSystemdConnection::new(),
-            notifications: vec![],
+            notifications: Arc::new(vec![]),
             systemd: MockupSystemdState::new(),
         };
         state.conn.error = true;
@@ -192,7 +211,7 @@ mod tests {
         let mut state = AppState {
             filter: FilterState::new(),
             conn: MockupSystemdConnection::new(),
-            notifications: vec![],
+            notifications: Arc::new(vec![]),
             systemd: MockupSystemdState::new(),
         };
         state.conn.units = vec![];
@@ -215,7 +234,7 @@ mod tests {
         let mut state = AppState {
             filter: FilterState::new(),
             conn: MockupSystemdConnection::new(),
-            notifications: vec![],
+            notifications: Arc::new(vec![]),
             systemd: MockupSystemdState::new(),
         };
         state.conn.units = vec![raw_unit.clone()];

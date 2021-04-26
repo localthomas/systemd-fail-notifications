@@ -11,13 +11,13 @@ use crate::{config::Config, status::UnitStatus};
 
 pub mod discord;
 
-pub trait NotificationProvider {
+pub trait NotificationProvider: Send + Sync {
     // TODO: allow multiple Results?
-    fn execute(&self, states: Vec<UnitStatus>) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send>;
+    fn execute(&self, states: Vec<UnitStatus>) -> Box<dyn FnOnce() -> Result<()> + 'static + Send>;
     fn execute_error(
         &self,
         error: &anyhow::Error,
-    ) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send>;
+    ) -> Box<dyn FnOnce() -> Result<()> + 'static + Send>;
 }
 
 pub fn create_notifications(config: &Config) -> Result<Vec<Box<dyn NotificationProvider>>> {

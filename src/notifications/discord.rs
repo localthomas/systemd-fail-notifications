@@ -1,5 +1,5 @@
 /*
-SPDX-FileCopyrightText: 2021 localtho name: (), value: () name: (), value: ()mas
+SPDX-FileCopyrightText: 2021 localthomas
 
 SPDX-License-Identifier: MIT OR Apache-2.0
 */
@@ -12,6 +12,7 @@ use crate::status::UnitStatus;
 
 use super::NotificationProvider;
 
+#[derive(Clone)]
 pub struct Discord {
     webhook_url: Url,
 }
@@ -66,10 +67,14 @@ impl Discord {
 }
 
 impl NotificationProvider for Discord {
-    fn execute(&self, states: Vec<UnitStatus>) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send> {
+    fn execute(&self, states: Vec<UnitStatus>) -> Box<dyn FnOnce() -> Result<()> + 'static + Send> {
+        // to make the closure being able to be send to another thread,
+        // the Discord config needs to be cloned, so that it can be transferred to the thread
+        let new_self: Discord = (*self).clone();
+
         Box::new(move || {
             for status in &states {
-                self.send_status(&status)?;
+                new_self.send_status(&status)?;
             }
             Ok(())
         })
@@ -78,8 +83,15 @@ impl NotificationProvider for Discord {
     fn execute_error(
         &self,
         error: &anyhow::Error,
-    ) -> Box<dyn Fn() -> Result<()> + '_ + Sync + Send> {
+    ) -> Box<dyn FnOnce() -> Result<()> + 'static + Send> {
+        // to make the closure being able to be send to another thread,
+        // the Discord config needs to be cloned, so that it can be transferred to the thread
+        let new_self = (*self).clone();
+
+        // create the description string outside the closure,
+        // so that the error does not need to be send to the thread
         let description = format!("{:?}", error);
+
         Box::new(move || {
             let payload = DiscordMessage {
                 content: "systemd-fail-notifications internal error!".to_string(),
@@ -89,7 +101,7 @@ impl NotificationProvider for Discord {
                 fields: vec![],
             }
             .to_json();
-            self.send(payload)
+            new_self.send(payload)
         })
     }
 }

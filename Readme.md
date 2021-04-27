@@ -5,7 +5,7 @@
 This software aims to provide a daemon that can be used to listen on a system bus to systemd changes and react to failed units with notifications.
 
 It is somewhat similar to [systemd_mon](https://github.com/joonty/systemd_mon), but instead of listening on the dbus for changes, polling is used to determine the current state of all systemd units.
-The configuration is done via environment variables and can not be set via a configuration file or command line arguments.
+The configuration is done via environment variables or command line arguments and can not be set via a configuration file.
 
 It requires a Linux host with systemd installed.
 
@@ -52,6 +52,9 @@ Enable the service file by running `systemctl enable /path/to/systemd-fail-notif
 
 
 ## Configuration Options
+
+Use the option `-h` to print all available configuration values and their corresponding environment variable names.
+The following table only shows the names of environment variables.
 
 | Name | Format | Description |
 | ---- | ------ | ----------- |

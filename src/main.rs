@@ -14,7 +14,6 @@ mod status;
 use std::{sync::Arc, thread, time};
 
 use anyhow::{Context, Result};
-use clap::Clap;
 use config::Config;
 use dbus_systemd::dbus::Connection;
 use dbus_systemd::SystemdConnection;
@@ -22,17 +21,6 @@ use filter::FilterState;
 use notifications::NotificationProvider;
 use state::{SystemdState, SystemdStateImpl};
 use status::UnitStatus;
-
-/// systemd-fail-notifications is a standalone binary that listens on the system bus and
-/// talks to systemd to identify failed units.
-/// Any configuration is done using environment variables.
-#[derive(Clap)]
-#[clap(version = env!("CARGO_PKG_VERSION"))]
-struct Options {
-    /// if set, print the licensing information as HTML and exit
-    #[clap(short, long)]
-    about: bool,
-}
 
 /// Holds the 'global' app internal state of the major sub-components.
 /// This includes the D-Bus connection to systemd, the notification providers and the app-local
@@ -119,11 +107,10 @@ where
 /// Notable side-effect: Uses environment variables to read the configuration.
 ///
 /// Not usable for unit tests, unless the presence of systemd can be verified.
-fn initialize<'a>() -> Result<AppState<'a, Connection, SystemdStateImpl>> {
+fn initialize<'a>(config: &Config) -> Result<AppState<'a, Connection, SystemdStateImpl>> {
     let filter = FilterState::new();
     let conn = Connection::new().context("could not create connection")?;
-    let conf = Config::new().context("could not create configuration")?;
-    let notifications = notifications::create_notifications(&conf)
+    let notifications = notifications::create_notifications(config)
         .context("could not create notifications provider")?;
     let systemd = SystemdStateImpl::new();
     Ok(AppState {
@@ -135,15 +122,15 @@ fn initialize<'a>() -> Result<AppState<'a, Connection, SystemdStateImpl>> {
 }
 
 fn main() -> Result<()> {
-    let opts: Options = Options::parse();
+    let config = Config::new().context("could not create configuration")?;
 
-    if opts.about {
+    if config.about {
         let about = include_str!("../license.html");
         println!("{}", about);
         return Ok(());
     }
 
-    let mut state = initialize()?;
+    let mut state = initialize(&config)?;
 
     looping(time::Duration::from_millis(2_000), move || {
         main_loop(&mut state).context("error during main loop")

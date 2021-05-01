@@ -160,7 +160,9 @@ fn main() -> Result<()> {
 
     let mut state = initialize(&config)?;
 
-    state.notify_start();
+    if !config.disable_start_notification {
+        state.notify_start();
+    }
     looping(time::Duration::from_millis(2_000), move || {
         main_loop(&mut state).context("error during main loop")
     })?;

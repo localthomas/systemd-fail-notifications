@@ -13,7 +13,8 @@ RUN cargo install cargo-about
 # final build
 COPY src ./src
 COPY *.rs *.toml *.hbs ./
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN cargo test --target x86_64-unknown-linux-musl --release --locked
+RUN cargo build --target x86_64-unknown-linux-musl --release --locked
 
 # --- bundle stage ---
 FROM scratch

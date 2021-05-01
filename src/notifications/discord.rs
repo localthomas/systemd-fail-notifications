@@ -18,6 +18,8 @@ pub struct Discord {
 }
 
 impl Discord {
+    /// Creates a new Discord notification provider with the given webhook URL as string.
+    /// The string must be a in a valid format for an URL.
     pub fn new(webhook_url: &str) -> Result<Self> {
         let url = Url::parse(webhook_url).context(format!(
             "could not parse discord webhook url '{}'",
@@ -26,6 +28,7 @@ impl Discord {
         Ok(Self { webhook_url: url })
     }
 
+    /// Sends the status of one unit to the specified Discord webhook URL.
     fn send_status(&self, status: &UnitStatus) -> Result<()> {
         let payload = DiscordMessage {
             content: "Unit Status changed!".to_string(),
@@ -54,13 +57,13 @@ impl Discord {
                     value: status.sub_state().to_string(),
                 },
             ],
-        }
-        .to_json();
+        };
         self.send(payload)
     }
 
-    fn send(&self, payload: serde_json::Value) -> Result<()> {
-        super::http_post(&self.webhook_url, vec![("wait", "true")], payload)
+    /// Sends the given webhook message for Discord to the configured webhook URL.
+    fn send(&self, payload: DiscordMessage) -> Result<()> {
+        super::http_post(&self.webhook_url, vec![("wait", "true")], payload.to_json())
             .context("could not execute discord webhook")?;
         Ok(())
     }
@@ -99,8 +102,7 @@ impl NotificationProvider for Discord {
                 description: description.clone(),
                 color: 13631488,
                 fields: vec![],
-            }
-            .to_json();
+            };
             new_self.send(payload)
         })
     }

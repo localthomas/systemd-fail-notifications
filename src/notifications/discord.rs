@@ -97,7 +97,7 @@ impl NotificationProvider for Discord {
 
         Box::new(move || {
             let payload = DiscordMessage {
-                content: "systemd-fail-notifications internal error!".to_string(),
+                content: format!("{} internal error!", env!("CARGO_PKG_NAME")),
                 title: "Internal Error!".to_string(),
                 description: description.clone(),
                 color: 13631488,
@@ -126,6 +126,9 @@ impl DiscordMessage {
         use chrono::{DateTime, Utc};
         let now = std::time::SystemTime::now();
         let now: DateTime<Utc> = now.into();
+        let hostname = gethostname::gethostname()
+            .into_string()
+            .unwrap_or("".to_string());
         let fields: Vec<serde_json::Value> = self
             .fields
             .iter()
@@ -142,7 +145,7 @@ impl DiscordMessage {
             "embeds": [
                 {
                     "author": {
-                        "name": "systemd-fail-notifications",
+                        "name": format!("{} on {}", env!("CARGO_PKG_NAME"), hostname),
                     },
                     "title": self.title,
                     "description": self.description,

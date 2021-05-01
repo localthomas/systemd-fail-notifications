@@ -106,6 +106,26 @@ impl NotificationProvider for Discord {
             new_self.send(payload)
         })
     }
+
+    fn execute_start(&self) -> Box<dyn FnOnce() -> Result<()> + 'static + Send> {
+        // to make the closure being able to be send to another thread,
+        // the Discord config needs to be cloned, so that it can be transferred to the thread
+        let new_self: Discord = (*self).clone();
+
+        Box::new(move || {
+            let payload = DiscordMessage {
+                content: format!(
+                    "{} is starting to listen to systemd...",
+                    env!("CARGO_PKG_NAME")
+                ),
+                title: "Starting".to_string(),
+                description: "Successfully started without errors and now listening for changes on systemd units".to_string(),
+                color: 6610199,
+                fields: vec![],
+            };
+            new_self.send(payload)
+        })
+    }
 }
 
 struct DiscordMessage {

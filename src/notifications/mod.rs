@@ -28,6 +28,10 @@ pub trait NotificationProvider: Send + Sync {
         &self,
         error: &anyhow::Error,
     ) -> Box<dyn FnOnce() -> Result<()> + 'static + Send>;
+
+    /// Produces a closure for notifying when this program is started and ready.
+    /// Should create a low priority informal message, if the notification system allows priority distinctions.
+    fn execute_start(&self) -> Box<dyn FnOnce() -> Result<()> + 'static + Send>;
 }
 
 /// Creates a default set of notification providers with the given configuration.

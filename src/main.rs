@@ -82,19 +82,47 @@ where
                 // execute a notification for the error itself
                 Err(error) => {
                     eprintln!("Error during notification: {:?}", error);
-                    for notification in &*notifications {
-                        let func = notification.execute_error(&error);
-                        // execute notification for error in separate thread
-                        std::thread::spawn(move || match func() {
-                            Err(error) => {
-                                eprintln!(
-                                    "Error during notification for error during notification: {:?}",
-                                    error
-                                );
-                            }
-                            Ok(_) => (),
-                        });
-                    }
+                    Self::notify_error(notifications, error);
+                }
+                Ok(_) => (),
+            });
+        }
+    }
+
+    /// Execute notifications for the start of the application, i.e. when it starts the main work and is ready.
+    fn notify_start(&self) {
+        // execute for each notification provider the provided function that executes the notification
+        // in a separate thread to prevent blocking the process in case of errors
+        for notification in &*self.notifications {
+            let func = notification.execute_start();
+
+            // clone the atomic reference for each thread that is spawned
+            let notifications = self.notifications.clone();
+            std::thread::spawn(move || match func() {
+                // if an error occurs during the execution of the notification function,
+                // execute a notification for the error itself
+                Err(error) => {
+                    eprintln!("Error during start-notification: {:?}", error);
+                    Self::notify_error(notifications, error);
+                }
+                Ok(_) => (),
+            });
+        }
+    }
+
+    /// Execute an error notification for program-internal errors.
+    /// All notifications are send in separate threads and any errors during sending out the error-notifications
+    /// are only printed to stderr and do not trigger any more notifications to prevent endless looping.
+    fn notify_error(notifications: Arc<Vec<Box<dyn NotificationProvider>>>, error: anyhow::Error) {
+        for notification in &*notifications {
+            let func = notification.execute_error(&error);
+            // execute notification for error in separate thread
+            std::thread::spawn(move || match func() {
+                Err(error) => {
+                    eprintln!(
+                        "Error during notification for error during notification: {:?}",
+                        error
+                    );
                 }
                 Ok(_) => (),
             });
@@ -132,6 +160,7 @@ fn main() -> Result<()> {
 
     let mut state = initialize(&config)?;
 
+    state.notify_start();
     looping(time::Duration::from_millis(2_000), move || {
         main_loop(&mut state).context("error during main loop")
     })?;

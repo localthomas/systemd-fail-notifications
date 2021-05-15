@@ -11,7 +11,13 @@ mod notifications;
 mod state;
 mod status;
 
-use std::{sync::Arc, thread, time};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread, time,
+};
 
 use anyhow::{Context, Result};
 use config::Config;
@@ -150,6 +156,18 @@ fn initialize<'a>(config: &Config) -> Result<AppState<'a, Connection, SystemdSta
 }
 
 fn main() -> Result<()> {
+    let term = Arc::new(AtomicBool::new(false));
+    // Make sure double CTRL+C and similar kills
+    for sig in signal_hook::consts::TERM_SIGNALS {
+        // When terminated by a second term signal, exit with exit code 1.
+        // This will do nothing the first time (because term_now is false).
+        signal_hook::flag::register_conditional_shutdown(*sig, 1, Arc::clone(&term))?;
+        // But this will "arm" the above for the second time, by setting it to true.
+        // The order of registering these is important, if you put this one first, it will
+        // first arm and then terminate ‒ all in the first round.
+        signal_hook::flag::register(*sig, Arc::clone(&term))?;
+    }
+
     let config = Config::new().context("could not create configuration")?;
 
     if config.about {
@@ -163,7 +181,7 @@ fn main() -> Result<()> {
     if !config.disable_start_notification {
         state.notify_start();
     }
-    looping(time::Duration::from_millis(2_000), move || {
+    looping(time::Duration::from_millis(2_000), term, move || {
         main_loop(&mut state).context("error during main loop")
     })?;
     Ok(())
@@ -188,13 +206,18 @@ where
 /// the next iteration follows promptly.
 ///
 /// The endless loop is stopped on receiving an error from the iteration function.
-fn looping<T: FnMut() -> Result<()>>(interval: time::Duration, mut function: T) -> Result<()> {
-    loop {
+fn looping<T: FnMut() -> Result<()>>(
+    interval: time::Duration,
+    termination: Arc<AtomicBool>,
+    mut function: T,
+) -> Result<()> {
+    while !termination.load(Ordering::Relaxed) {
         let start = time::Instant::now();
         function()?;
         // measure time and then sleep exact so long that the interval is met
         thread::sleep(interval - start.elapsed());
     }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -16,7 +16,7 @@ There are two ways available to run this application: either by using the static
 ### Container
 
 The easiest way to obtain a current version of this software and run it is to create a container image.
-Clone this repository and build the container image by executing `docker build -t systemd-fail-notifications:latest .`.
+Clone this repository and build the container image by executing `docker build -t systemd-fail-notifications:latest .` or download a pre-built image via the [GitHub Container Registry](https://github.com/localthomas/systemd-fail-notifications/pkgs/container/systemd-fail-notifications).
 
 To run the container (e.g. with docker):
 

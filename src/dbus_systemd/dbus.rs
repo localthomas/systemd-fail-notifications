@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 use anyhow::{Context, Result};
 use zbus::export::zvariant::derive::Type;
 use zbus::export::zvariant::export::serde::Deserialize;
-use zbus::export::zvariant::{self, OwnedObjectPath};
+use zbus::export::zvariant::OwnedObjectPath;
 
 use super::SystemdConnection;
 

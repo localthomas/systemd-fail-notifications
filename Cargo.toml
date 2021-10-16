@@ -13,13 +13,14 @@ name = "systemd-fail-notifications"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0.40"
+anyhow = "1.0.44"
 chrono = "0.4.19"
-clap = { version = "3.0.0-beta.2", default-features = false, features = ["std"] }
+clap = { version = "3.0.0-beta.4", default-features = false, features = ["std", "env"] }
 gethostname = "0.2.1"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-serde_json = "1.0.64"
-signal-hook = "0.3.8"
-ureq = { version = "2.1.0", features = ["json"] }
-url = "2.2.1"
-zbus = "1.9.1"
+serde_json = "1.0.68"
+signal-hook = "0.3.10"
+ureq = { version = "2.2.0", features = ["json"] }
+url = "2.2.2"
+zbus = "1.9.2"
+zvariant = "2.9.0"

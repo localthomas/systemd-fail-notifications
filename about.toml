@@ -6,3 +6,6 @@ accepted = [
     "MPL-2.0",
     "OpenSSL",
 ]
+# there is a detection issue with the ring library,
+# which is fixed by activating this workaround
+workarounds = ["ring"]

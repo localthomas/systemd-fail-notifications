@@ -2,7 +2,7 @@ use std::io::prelude::*;
 use std::{fs::File, process::Command};
 
 fn main() {
-    // only run this build script for generatiing the license information on relevant files
+    // only run this build script for generating the license information on relevant files
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=Cargo.lock");
     println!("cargo:rerun-if-changed=about.toml");

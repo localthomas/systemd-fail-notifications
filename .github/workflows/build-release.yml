@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  IMAGE_NAME: systemd-fail-notifications
 
 jobs:
   build:
@@ -14,27 +15,59 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v2
-      - name: Install MUSL development
-        run: sudo apt install musl-dev musl-tools
-      - name: Add rust target MUSL
-        run: rustup target add x86_64-unknown-linux-musl
-      - name: Fetch cargo-about dependency
-        run: cargo install cargo-about
-      - name: Test
-        run: cargo test --target x86_64-unknown-linux-musl --release --locked
-      - name: Build
-        run: cargo build --target x86_64-unknown-linux-musl --release --locked
-      - name: Get the version
+      - name: install nix
+        uses: cachix/install-nix-action@v15
+      - name: get the version
         id: get_version
         if: startsWith(github.ref, 'refs/tags/')
         run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
-      - name: Release
+
+      - name: execute checks
+        run: nix flake check
+      - name: build container image
+        run: nix build .#systemd-fail-notifications-image
+      - name: load image into docker
+        run: docker load < result
+      - name: test run with help-output
+        run: docker run systemd-fail-notifications:latest --help
+
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Push image
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo ${{ steps.get_version.outputs.VERSION }} | sed -e 's/^v//')
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          # Tag with full semantic version and also set it as latest
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:latest
+          docker push $IMAGE_ID:latest
+          # Tag with only major and minor (i.e. without the last number)
+          VERSION=${VERSION%.*}
+          echo VERSION=$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
+          # Tag with only major
+          VERSION=${VERSION%.*}
+          echo VERSION=$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
+
+      - name: build static binary
+        run: nix build .#systemd-fail-notifications
+
+      - name: release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: target/x86_64-unknown-linux-musl/release/systemd-fail-notifications
+          files: result/bin/systemd-fail-notifications
           body_path: changelogs/${{ steps.get_version.outputs.VERSION }}.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

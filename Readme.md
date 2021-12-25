@@ -64,6 +64,9 @@ The following table only shows the names of environment variables.
 
 To build the third-party license information, the [cargo-about](https://github.com/EmbarkStudios/cargo-about) cargo plugin is required.
 
+This project provides a `flake.nix` and a `shell.nix` file, which can be used with a flake-enabled nix tool to build binaries, images, enter a development shell, and run checks (REUSE compliance and formatting).
+Use the flake command `nix flake show` to see what is available and run `nix flake check` before committing.
+
 #### License
 
 This repository aims to be compliant with the [REUSE specification 3.0](https://reuse.software/spec/).

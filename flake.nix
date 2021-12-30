@@ -8,6 +8,7 @@
     # for eachSystem function
     flake-utils.url = "github:numtide/flake-utils";
     # use flake-compat as side-effect for flake.lock file that is read by shell.nix
+    # fill the flake.lock file with `nix flake lock --update-input flake-compat`
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
@@ -41,6 +42,10 @@
           cargo = rust;
           rustc = rust;
         };
+
+        # Optional revision label for the image
+        optionalImageLabel =
+          if (self ? rev) then { "org.opencontainers.image.revision" = self.rev; } else { };
       in
       with pkgs;
       {
@@ -86,9 +91,8 @@
                 "org.opencontainers.image.authors" = builtins.concatStringsSep "; " cargo-metadata.package.authors;
                 "org.opencontainers.image.version" = cargo-metadata.package.version;
                 "org.opencontainers.image.source" = cargo-metadata.package.repository;
-                "org.opencontainers.image.revision" = if (self ? rev) then self.rev else "from dirty repository";
                 "org.opencontainers.image.licenses" = cargo-metadata.package.license;
-              };
+              } // optionalImageLabel;
             };
           };
 

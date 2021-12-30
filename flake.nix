@@ -91,9 +91,13 @@
               };
             } //
             # Optional revision label for the image
-            (lib.optionalAttrs (self ? rev) {
-              "org.opencontainers.image.revision" = self.rev;
-            });
+            lib.trace
+              (self ? rev)
+              lib.trace
+              (self.rev)
+              (lib.optionalAttrs (self ? rev) {
+                "org.opencontainers.image.revision" = self.rev;
+              });
           };
 
         packages.${crateName} = naersk-lib.buildPackage {

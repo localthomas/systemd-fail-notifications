@@ -88,16 +88,12 @@
                 "org.opencontainers.image.version" = cargo-metadata.package.version;
                 "org.opencontainers.image.source" = cargo-metadata.package.repository;
                 "org.opencontainers.image.licenses" = cargo-metadata.package.license;
-              };
-            } //
-            # Optional revision label for the image
-            lib.trace
-              (self ? rev)
-              lib.trace
-              (self.rev)
+              } //
+              # Optional revision label for the image
               (lib.optionalAttrs (self ? rev) {
                 "org.opencontainers.image.revision" = self.rev;
               });
+            };
           };
 
         packages.${crateName} = naersk-lib.buildPackage {

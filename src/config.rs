@@ -31,28 +31,28 @@ impl Config {
             "SYSTEMD_FAIL_NOTIFICATIONS_DISCORD_WEBHOOK_URL",
             "the webhook-URL of the Discord webhook like 'https://discord.com/api/webhooks/<id>/<token>'",
         );
-        use clap::{App, Arg};
-        let matches = App::new(env!("CARGO_PKG_NAME"))
+        use clap::{Arg, Command};
+        let matches = Command::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .about(env!("CARGO_PKG_DESCRIPTION"))
             .arg(
                 Arg::new(ABOUT.0)
                     .short(ABOUT.1)
                     .long(ABOUT.0)
-                    .about(ABOUT.2)
+                    .help(ABOUT.2)
                     .takes_value(false),
             )
             .arg(
                 Arg::new(DISABLE_START_NOTIFICATION.0)
                     .long(DISABLE_START_NOTIFICATION.0)
-                    .about(DISABLE_START_NOTIFICATION.1)
+                    .help(DISABLE_START_NOTIFICATION.1)
                     .takes_value(false),
             )
             .arg(
                 Arg::new(DISCORD_WEBHOOK_URL.0)
                     .long(DISCORD_WEBHOOK_URL.0)
                     .env(DISCORD_WEBHOOK_URL.1)
-                    .about(DISCORD_WEBHOOK_URL.2)
+                    .help(DISCORD_WEBHOOK_URL.2)
                     .takes_value(true),
             )
             .get_matches();

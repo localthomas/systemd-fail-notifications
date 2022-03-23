@@ -77,7 +77,7 @@ impl NotificationProvider for Discord {
 
         Box::new(move || {
             for status in &states {
-                new_self.send_status(&status)?;
+                new_self.send_status(status)?;
             }
             Ok(())
         })
@@ -148,7 +148,7 @@ impl DiscordMessage {
         let now: DateTime<Utc> = now.into();
         let hostname = gethostname::gethostname()
             .into_string()
-            .unwrap_or("".to_string());
+            .unwrap_or_else(|_| "".to_string());
         let fields: Vec<serde_json::Value> = self
             .fields
             .iter()

@@ -66,8 +66,5 @@ impl Config {
 }
 
 fn option_str_to_string(value: Option<&str>) -> Option<String> {
-    match value {
-        Some(val) => Some(val.to_string()),
-        None => None,
-    }
+    value.map(|val| val.to_string())
 }

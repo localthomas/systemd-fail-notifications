@@ -44,7 +44,7 @@ pub fn create_notifications(config: &Config) -> Result<Vec<Box<dyn NotificationP
             .context("could not create discord notification provider")?;
         notifications.push(Box::new(discord));
     }
-    if notifications.len() == 0 {
+    if notifications.is_empty() {
         return Err(anyhow!(
             "no notification provider could be created. Is the configuration correctly set?"
         ));

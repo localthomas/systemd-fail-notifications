@@ -83,14 +83,13 @@ where
 
             // clone the atomic reference for each thread that is spawned
             let notifications = self.notifications.clone();
-            std::thread::spawn(move || match func() {
+            std::thread::spawn(move || {
                 // if an error occurs during the execution of the notification function,
                 // execute a notification for the error itself
-                Err(error) => {
+                if let Err(error) = func() {
                     eprintln!("Error during notification: {:?}", error);
                     Self::notify_error(notifications, error);
                 }
-                Ok(_) => (),
             });
         }
     }
@@ -104,14 +103,13 @@ where
 
             // clone the atomic reference for each thread that is spawned
             let notifications = self.notifications.clone();
-            std::thread::spawn(move || match func() {
+            std::thread::spawn(move || {
                 // if an error occurs during the execution of the notification function,
                 // execute a notification for the error itself
-                Err(error) => {
+                if let Err(error) = func() {
                     eprintln!("Error during start-notification: {:?}", error);
                     Self::notify_error(notifications, error);
                 }
-                Ok(_) => (),
             });
         }
     }
@@ -123,14 +121,13 @@ where
         for notification in &*notifications {
             let func = notification.execute_error(&error);
             // execute notification for error in separate thread
-            std::thread::spawn(move || match func() {
-                Err(error) => {
+            std::thread::spawn(move || {
+                if let Err(error) = func() {
                     eprintln!(
                         "Error during notification for error during notification: {:?}",
                         error
                     );
                 }
-                Ok(_) => (),
             });
         }
     }

@@ -7,6 +7,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 use anyhow::{Context, Result};
 use zbus::export::zvariant::derive::Type;
 use zbus::export::zvariant::export::serde::Deserialize;
+use zbus::export::zvariant::OwnedObjectPath;
 
 use super::SystemdConnection;
 
@@ -73,6 +74,8 @@ impl From<UnitStatusInternal> for UnitStatusRaw {
     }
 }
 
+// Note that this struct is used for serialization and therefore each field is important, even if it is not used.
+#[allow(dead_code)]
 #[derive(Deserialize, Debug, Type, Clone)]
 struct UnitStatusInternal {
     name: String,
@@ -81,4 +84,8 @@ struct UnitStatusInternal {
     active_state: String,
     sub_state: String,
     following_unit: String,
+    unit_object_path: OwnedObjectPath,
+    job_queued_id: u32,
+    job_type: String,
+    job_object_path: OwnedObjectPath,
 }

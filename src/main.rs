@@ -88,7 +88,7 @@ where
                 // execute a notification for the error itself
                 if let Err(error) = func() {
                     eprintln!("Error during notification: {:?}", error);
-                    Self::notify_error_internal(notifications, error);
+                    Self::notify_error_internal(notifications, &error, false);
                 }
             });
         }
@@ -108,7 +108,7 @@ where
                 // execute a notification for the error itself
                 if let Err(error) = func() {
                     eprintln!("Error during start-notification: {:?}", error);
-                    Self::notify_error_internal(notifications, error);
+                    Self::notify_error_internal(notifications, &error, false);
                 }
             });
         }
@@ -117,19 +117,23 @@ where
     /// Execute an error notification for program-internal errors.
     /// All notifications are send in separate threads and any errors during sending out the error-notifications
     /// are only printed to stderr and do not trigger any more notifications to prevent endless looping.
-    fn notify_error(&self, error: anyhow::Error) {
-        Self::notify_error_internal(self.notifications.clone(), error);
+    ///
+    /// If `synchronous` is set to true, the call will block until all notification providers handled the sending.
+    fn notify_error(&self, error: &anyhow::Error, synchronous: bool) {
+        Self::notify_error_internal(self.notifications.clone(), error, synchronous);
     }
 
     /// The same as [`Self::notify_error`], but can use a custom reference to notification providers.
     fn notify_error_internal(
         notifications: Arc<Vec<Box<dyn NotificationProvider>>>,
-        error: anyhow::Error,
+        error: &anyhow::Error,
+        synchronous: bool,
     ) {
+        let mut thread_handles = Vec::new();
         for notification in &*notifications {
-            let func = notification.execute_error(&error);
+            let func = notification.execute_error(error);
             // execute notification for error in separate thread
-            std::thread::spawn(move || {
+            let handle = std::thread::spawn(move || {
                 if let Err(error) = func() {
                     eprintln!(
                         "Error during notification for error during notification: {:?}",
@@ -137,6 +141,19 @@ where
                     );
                 }
             });
+            thread_handles.push(handle);
+        }
+
+        // if synchronous execution is set, join all threads before resuming
+        if synchronous {
+            for thread_handle in thread_handles {
+                if let Err(err) = thread_handle.join() {
+                    eprintln!(
+                        "could not join thread for notification provider: {:#?}",
+                        err
+                    );
+                }
+            }
         }
     }
 }
@@ -189,7 +206,10 @@ fn main() -> Result<()> {
 
     // if the error_boundary function produces an error, it can be send as notification
     if let Err(err) = error_boundary(&mut state, termination) {
-        state.notify_error(err);
+        let err = err.context("error during main execution");
+        eprintln!("{}", err);
+        // Note: wait for the sending of errors, as the program terminates right after this execution
+        state.notify_error(&err, true);
     }
     Ok(())
 }

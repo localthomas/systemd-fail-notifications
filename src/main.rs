@@ -88,7 +88,7 @@ where
                 // execute a notification for the error itself
                 if let Err(error) = func() {
                     eprintln!("Error during notification: {:?}", error);
-                    Self::notify_error(notifications, error);
+                    Self::notify_error_internal(notifications, error);
                 }
             });
         }
@@ -108,7 +108,7 @@ where
                 // execute a notification for the error itself
                 if let Err(error) = func() {
                     eprintln!("Error during start-notification: {:?}", error);
-                    Self::notify_error(notifications, error);
+                    Self::notify_error_internal(notifications, error);
                 }
             });
         }
@@ -117,7 +117,15 @@ where
     /// Execute an error notification for program-internal errors.
     /// All notifications are send in separate threads and any errors during sending out the error-notifications
     /// are only printed to stderr and do not trigger any more notifications to prevent endless looping.
-    fn notify_error(notifications: Arc<Vec<Box<dyn NotificationProvider>>>, error: anyhow::Error) {
+    fn notify_error(&self, error: anyhow::Error) {
+        Self::notify_error_internal(self.notifications.clone(), error);
+    }
+
+    /// The same as [`Self::notify_error`], but can use a custom reference to notification providers.
+    fn notify_error_internal(
+        notifications: Arc<Vec<Box<dyn NotificationProvider>>>,
+        error: anyhow::Error,
+    ) {
         for notification in &*notifications {
             let func = notification.execute_error(&error);
             // execute notification for error in separate thread
@@ -153,16 +161,16 @@ fn initialize<'a>(config: &Config) -> Result<AppState<'a, Connection, SystemdSta
 }
 
 fn main() -> Result<()> {
-    let term = Arc::new(AtomicBool::new(false));
+    let termination = Arc::new(AtomicBool::new(false));
     // Make sure double CTRL+C and similar kills
     for sig in signal_hook::consts::TERM_SIGNALS {
         // When terminated by a second term signal, exit with exit code 1.
         // This will do nothing the first time (because term_now is false).
-        signal_hook::flag::register_conditional_shutdown(*sig, 1, Arc::clone(&term))?;
+        signal_hook::flag::register_conditional_shutdown(*sig, 1, Arc::clone(&termination))?;
         // But this will "arm" the above for the second time, by setting it to true.
         // The order of registering these is important, if you put this one first, it will
         // first arm and then terminate ‒ all in the first round.
-        signal_hook::flag::register(*sig, Arc::clone(&term))?;
+        signal_hook::flag::register(*sig, Arc::clone(&termination))?;
     }
 
     let config = Config::new().context("could not create configuration")?;
@@ -173,13 +181,28 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let mut state = initialize(&config)?;
+    let mut state = initialize(&config).context("could not initialize state")?;
 
     if !config.disable_start_notification {
         state.notify_start();
     }
-    looping(time::Duration::from_millis(2_000), term, move || {
-        main_loop(&mut state).context("error during main loop")
+
+    // if the error_boundary function produces an error, it can be send as notification
+    if let Err(err) = error_boundary(&mut state, termination) {
+        state.notify_error(err);
+    }
+    Ok(())
+}
+
+/// This function is similar to a main function, but requires the app's state for execution.
+/// In practice, it should be called from the [`main`] function and resulting errors should be handled by creating a notification.
+fn error_boundary<C, S>(state: &mut AppState<'_, C, S>, termination: Arc<AtomicBool>) -> Result<()>
+where
+    C: SystemdConnection,
+    S: SystemdState,
+{
+    looping(time::Duration::from_millis(2_000), termination, move || {
+        main_loop(state).context("error during main loop")
     })?;
     Ok(())
 }
@@ -199,7 +222,7 @@ where
 }
 
 /// Provides a timed loop, where each iteration is executed in the specified interval.
-/// If the execution of the function in an iteration is taking longer than the specified interval
+/// If the execution of the function in an iteration is taking longer than the specified interval,
 /// the next iteration follows promptly.
 ///
 /// The endless loop is stopped on receiving an error from the iteration function.

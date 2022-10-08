@@ -1,5 +1,7 @@
 [![REUSE Compliance Check](https://github.com/localthomas/systemd-fail-notifications/actions/workflows/reuse-check.yml/badge.svg)](https://github.com/localthomas/systemd-fail-notifications/actions/workflows/reuse-check.yml)
 
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+
 # systemd-fail-notifications
 
 This software aims to provide a daemon that can be used to listen on a system bus to systemd changes and react to failed units with notifications.

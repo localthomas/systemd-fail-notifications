@@ -22,5 +22,5 @@ signal-hook = "0.3"
 time = { version = "0.3", features = ["formatting"] }
 ureq = { version = "2.4", features = ["json"] }
 url = "2.2"
-zbus = "1.9"
-zvariant = "2.10"
+zbus = "3.13"
+zvariant = "3.13"

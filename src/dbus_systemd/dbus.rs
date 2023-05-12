@@ -5,19 +5,18 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 */
 
 use anyhow::{Context, Result};
-use zbus::export::zvariant::derive::Type;
-use zbus::export::zvariant::export::serde::Deserialize;
-use zbus::export::zvariant::OwnedObjectPath;
+use serde::Deserialize;
+use zvariant::{OwnedObjectPath, Type};
 
 use super::SystemdConnection;
 
 pub struct Connection {
-    conn: zbus::Connection,
+    conn: zbus::blocking::Connection,
 }
 
 impl Connection {
     pub fn new() -> Result<Self> {
-        let conn = zbus::Connection::new_system().context(format!(
+        let conn = zbus::blocking::Connection::system().context(format!(
             "could not connect to system bus at {}",
             dbus_system_address()
         ))?;

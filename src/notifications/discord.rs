@@ -143,9 +143,7 @@ struct DiscordMessageField {
 
 impl DiscordMessage {
     fn to_json(&self) -> serde_json::Value {
-        use chrono::{DateTime, Utc};
-        let now = std::time::SystemTime::now();
-        let now: DateTime<Utc> = now.into();
+        let now = time::OffsetDateTime::now_utc();
         let hostname = gethostname::gethostname()
             .into_string()
             .unwrap_or_else(|_| "".to_string());
@@ -160,6 +158,10 @@ impl DiscordMessage {
                 })
             })
             .collect();
+        let time_format =
+            time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second] [offset_hour sign:mandatory]:[offset_minute]")
+                .expect("could not create time format string");
+
         json!({
             "content": self.content,
             "embeds": [
@@ -169,11 +171,11 @@ impl DiscordMessage {
                     },
                     "title": self.title,
                     "description": self.description,
-                    "timestamp": now.to_rfc3339(),
+                    "timestamp": now.format(&time::format_description::well_known::Rfc3339).expect("could not format timestamp as RFC3339"),
                     "color": self.color,
                     "fields": fields,
                     "footer": {
-                        "text": format!("message created at system time: {}", now.format("%Y-%m-%d %H:%M:%S %:z")),
+                        "text": format!("message created at system time: {}", now.format(&time_format).expect("could not format timestamp")),
                     },
                 }
             ],

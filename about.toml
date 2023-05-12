@@ -9,3 +9,11 @@ accepted = [
 # there is a detection issue with the ring library,
 # which is fixed by activating this workaround
 workarounds = ["ring"]
+
+# manual workarounds for specific dependencies
+
+[unicode-ident]
+accepted = ["Unicode-DFS-2016"]
+
+[webpki]
+accepted = ["ISC", "BSD-3-Clause", "NOASSERTION"]

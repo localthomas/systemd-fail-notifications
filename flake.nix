@@ -45,7 +45,7 @@
       in
       with pkgs;
       {
-        devShell = mkShell {
+        devShells.default = mkShell {
           # tools and dependencies for building and developing
           nativeBuildInputs = [ nixpkgs-fmt rust cargo-about reuse ];
         };
@@ -53,7 +53,7 @@
         checks = {
           format = runCommand "check-format"
             {
-              nativeBuildInputs = [ self.devShell.${system}.nativeBuildInputs ];
+              nativeBuildInputs = [ self.devShells.${system}.default.nativeBuildInputs ];
             }
             ''
               cargo-fmt fmt --manifest-path ${./.}/Cargo.toml -- --check
@@ -62,7 +62,7 @@
             '';
           reuse = runCommand "check-reuse"
             {
-              nativeBuildInputs = [ self.devShell.${system}.nativeBuildInputs ];
+              nativeBuildInputs = [ self.devShells.${system}.default.nativeBuildInputs ];
             }
             ''
               reuse --root ${./.} lint
@@ -75,7 +75,7 @@
             name = crateName;
             tag = "latest";
             created = "now";
-            contents = self.packages.${system}.${crateName};
+            copyToRoot = self.packages.${system}.${crateName};
             config = {
               # Note that the entrypoint is *not* "${self.packages.${system}.${crateName}}/bin/${crateName}"
               Entrypoint = [ "./bin/${crateName}" ];
@@ -100,14 +100,14 @@
           pname = crateName;
           root = ./.;
           # The packages of the devShell are re-used for building
-          nativeBuildInputs = [ self.devShell.${system}.nativeBuildInputs ];
+          nativeBuildInputs = [ self.devShells.${system}.default.nativeBuildInputs ];
           # Configures the target which will be built.
           # ref: https://doc.rust-lang.org/cargo/reference/config.html#buildtarget
           CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
           doCheck = true;
         };
 
-        defaultPackage = self.packages.${system}.${crateName};
+        packages.default = self.packages.${system}.${crateName};
       }
     );
 }

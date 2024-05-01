@@ -9,9 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: install nix
-        uses: cachix/install-nix-action@v15
+        uses: cachix/install-nix-action@v22
       - name: execute checks
         run: nix flake check
       - name: test build

@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use serde_json::json;
 use url::Url;
 
-use crate::status::UnitStatus;
+use crate::status::{ActiveState, UnitStatus};
 
 use super::NotificationProvider;
 
@@ -30,11 +30,16 @@ impl Discord {
 
     /// Sends the status of one unit to the specified Discord webhook URL.
     fn send_status(&self, status: &UnitStatus) -> Result<()> {
+        let (text, color) = if status.active_state() == &ActiveState::Active {
+            (format!("✔ {} recovered!", status.name()), 6610199)
+        } else {
+            (format!("❌ {} has failed!", status.name()), 13631488)
+        };
         let payload = DiscordMessage {
-            content: "Unit Status changed!".to_string(),
-            title: format!("{} has failed!", status.name()),
+            content: text.clone(),
+            title: text.clone(),
             description: "The following unit has entered a new state:".to_string(),
-            color: 13631488,
+            color: color,
             fields: vec![
                 DiscordMessageField {
                     name: "Name".to_string(),

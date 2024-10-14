@@ -19,20 +19,20 @@ impl<'a> FilterState<'a> {
         let name_filter = |name: &str| name.ends_with(".service");
         let state_filter = |old_active_state: Option<ActiveState>,
                             new_load_state: LoadState,
-                            new_active_state: ActiveState| match (
-            old_active_state,
-            new_load_state,
-            new_active_state,
-        ) {
-            (_, LoadState::Error, _) => true,
-            // only trigger if not-found is coupled with anything not inactive
-            (_, LoadState::NotFound, ActiveState::Inactive) => false,
-            (_, LoadState::NotFound, _) => true,
-            (_, LoadState::Unknown(_), _) => true,
-            (_, _, ActiveState::Failed) => true,
-            (_, _, ActiveState::Unknown(_)) => true,
-            // otherwise false
-            _ => false,
+                            new_active_state: ActiveState| {
+            match (old_active_state, new_load_state, new_active_state.clone()) {
+                (_, LoadState::Error, _) => true,
+                // only trigger if not-found is coupled with anything not inactive
+                (_, LoadState::NotFound, ActiveState::Inactive) => false,
+                (_, LoadState::NotFound, _) => true,
+                (_, LoadState::Unknown(_), _) => true,
+                (_, _, ActiveState::Failed) => true,
+                (_, _, ActiveState::Unknown(_)) => true,
+                // also trigger when a service recovered
+                (Some(ActiveState::Failed), _, _) => new_active_state != ActiveState::Failed,
+                // otherwise false
+                _ => false,
+            }
         };
         Self {
             name_filter: Box::new(name_filter),

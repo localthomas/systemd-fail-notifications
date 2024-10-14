@@ -50,6 +50,7 @@ fn dbus_system_address() -> String {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug, Type, Clone)]
 pub struct UnitStatusRaw {
     pub name: String,

@@ -4,24 +4,25 @@ SPDX-FileCopyrightText: 2021 localthomas
 SPDX-License-Identifier: MIT OR Apache-2.0
 */
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::status::UnitStatus;
 
 pub trait SystemdState {
     /// Applies the new state and returns a list of changes compared to the existing state.
     /// Note that the changes are calculated based on the name of the unit.
+    /// Note that once a status for a unit name was saved, it is never "forgotten", even if a new state does not contain the unit name any more.
     fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<ChangedUnitStatus>;
 }
 
 pub struct SystemdStateImpl {
-    systemd_state: HashSet<UnitStatus>,
+    systemd_state: HashMap<String, UnitStatus>,
 }
 
 impl SystemdStateImpl {
     pub fn new() -> Self {
         Self {
-            systemd_state: HashSet::new(),
+            systemd_state: HashMap::new(),
         }
     }
 }
@@ -35,28 +36,32 @@ pub struct ChangedUnitStatus {
 }
 
 impl<'a> SystemdState for SystemdStateImpl {
-    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<ChangedUnitStatus> {
-        let mut new_state = HashSet::with_capacity(new_status.len());
-        new_status.into_iter().for_each(|status| {
-            new_state.insert(status);
-        });
-        let old_state = self.systemd_state.clone();
-        let changes: Vec<UnitStatus> = new_state.difference(&old_state).cloned().collect();
-        self.systemd_state = new_state;
-
-        // map changes: when an item was changed, check if there is an old equivalent (based on the name of the unit) available
-        changes
-            .into_iter()
-            .map(|new_unit_status| {
-                let old_unit_status = old_state
-                    .iter()
-                    .find(|unit_status| unit_status.name() == new_unit_status.name());
-                ChangedUnitStatus {
-                    old: old_unit_status.cloned(),
-                    new: new_unit_status,
+    fn apply_new_status(&mut self, new_state: Vec<UnitStatus>) -> Vec<ChangedUnitStatus> {
+        // apply the new state unit by unit and check for changes
+        let mut changes: Vec<ChangedUnitStatus> = Vec::new();
+        for new_status in new_state {
+            // set the new one and get the old one
+            let old_status = self
+                .systemd_state
+                .insert(new_status.name().clone(), new_status.clone());
+            // check for a change
+            if let Some(old_status) = old_status {
+                if old_status != new_status {
+                    // change detected: store as change for return value
+                    changes.push(ChangedUnitStatus {
+                        old: Some(old_status),
+                        new: new_status,
+                    });
                 }
-            })
-            .collect()
+            } else {
+                // there was no previous value, this is also a change
+                changes.push(ChangedUnitStatus {
+                    old: None,
+                    new: new_status,
+                });
+            }
+        }
+        changes
     }
 }
 

@@ -58,6 +58,7 @@ where
             .iter()
             .cloned()
             .filter(|status| self.filter.filter_function(status))
+            .map(|changed_state| changed_state.new)
             .collect();
         Ok(filtered)
     }

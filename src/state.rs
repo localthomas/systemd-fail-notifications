@@ -9,7 +9,9 @@ use std::collections::HashSet;
 use crate::status::UnitStatus;
 
 pub trait SystemdState {
-    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<UnitStatus>;
+    /// Applies the new state and returns a list of changes compared to the existing state.
+    /// Note that the changes are calculated based on the name of the unit.
+    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<ChangedUnitStatus>;
 }
 
 pub struct SystemdStateImpl {
@@ -24,15 +26,37 @@ impl SystemdStateImpl {
     }
 }
 
+/// Holds the information about a change between two states.
+/// Namely, the old and new states.
+#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+pub struct ChangedUnitStatus {
+    pub old: Option<UnitStatus>,
+    pub new: UnitStatus,
+}
+
 impl<'a> SystemdState for SystemdStateImpl {
-    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<UnitStatus> {
+    fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<ChangedUnitStatus> {
         let mut new_state = HashSet::with_capacity(new_status.len());
         new_status.into_iter().for_each(|status| {
             new_state.insert(status);
         });
-        let changes: Vec<UnitStatus> = new_state.difference(&self.systemd_state).cloned().collect();
+        let old_state = self.systemd_state.clone();
+        let changes: Vec<UnitStatus> = new_state.difference(&old_state).cloned().collect();
         self.systemd_state = new_state;
+
+        // map changes: when an item was changed, check if there is an old equivalent (based on the name of the unit) available
         changes
+            .into_iter()
+            .map(|new_unit_status| {
+                let old_unit_status = old_state
+                    .iter()
+                    .find(|unit_status| unit_status.name() == new_unit_status.name());
+                ChangedUnitStatus {
+                    old: old_unit_status.cloned(),
+                    new: new_unit_status,
+                }
+            })
+            .collect()
     }
 }
 
@@ -51,9 +75,16 @@ pub mod tests {
     }
 
     impl SystemdState for MockupSystemdState {
-        fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<UnitStatus> {
+        /// Discards the old state completely and returns the new status as is.
+        fn apply_new_status(&mut self, new_status: Vec<UnitStatus>) -> Vec<ChangedUnitStatus> {
             self.last_state = Some(new_status.clone());
             new_status
+                .into_iter()
+                .map(|status| ChangedUnitStatus {
+                    old: None,
+                    new: status,
+                })
+                .collect()
         }
     }
 
@@ -77,7 +108,10 @@ pub mod tests {
         let mut state = SystemdStateImpl::new();
         assert_eq!(
             state.apply_new_status(vec![test_status.clone()]),
-            vec![test_status.clone()]
+            vec![ChangedUnitStatus {
+                old: None,
+                new: test_status.clone(),
+            }]
         );
     }
 
@@ -95,12 +129,15 @@ pub mod tests {
         assert_eq!(state.apply_new_status(vec![]), vec![]);
         assert_eq!(
             state.apply_new_status(vec![test_status.clone()]),
-            vec![test_status.clone()]
+            vec![ChangedUnitStatus {
+                old: None,
+                new: test_status.clone(),
+            }]
         );
     }
 
     #[test]
-    fn on_state_changed_note_called_for_smaller_state() {
+    fn on_state_changed_called_for_smaller_state() {
         let test_status = UnitStatus::from(crate::dbus_systemd::dbus::UnitStatusRaw {
             name: String::from("name"),
             description: String::from("desc"),
@@ -112,9 +149,47 @@ pub mod tests {
         let mut state = SystemdStateImpl::new();
         assert_eq!(
             state.apply_new_status(vec![test_status.clone()]),
-            vec![test_status.clone()]
+            vec![ChangedUnitStatus {
+                old: None,
+                new: test_status.clone(),
+            }]
         );
         assert_eq!(state.apply_new_status(vec![]), vec![]);
         assert_eq!(state.apply_new_status(vec![]), vec![]);
+    }
+
+    #[test]
+    fn on_state_changed_called_for_one_changed_state() {
+        let test_status_old = UnitStatus::from(crate::dbus_systemd::dbus::UnitStatusRaw {
+            name: String::from("name"),
+            description: String::from("desc"),
+            load_state: String::from("test"),
+            active_state: String::from("test"),
+            sub_state: String::from("test"),
+            following_unit: String::from("test"),
+        });
+        let test_status_new = UnitStatus::from(crate::dbus_systemd::dbus::UnitStatusRaw {
+            name: String::from("name"),
+            description: String::from("desc"),
+            load_state: String::from("test"),
+            active_state: String::from("test123"),
+            sub_state: String::from("test"),
+            following_unit: String::from("test"),
+        });
+        let mut state = SystemdStateImpl::new();
+        assert_eq!(
+            state.apply_new_status(vec![test_status_old.clone()]),
+            vec![ChangedUnitStatus {
+                old: None,
+                new: test_status_old.clone(),
+            }]
+        );
+        assert_eq!(
+            state.apply_new_status(vec![test_status_new.clone()]),
+            vec![ChangedUnitStatus {
+                old: Some(test_status_old),
+                new: test_status_new.clone(),
+            }]
+        );
     }
 }

@@ -12,6 +12,7 @@ mod state;
 mod status;
 
 use std::{
+    path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -169,7 +170,7 @@ fn initialize<'a>(config: &Config) -> Result<AppState<'a, Connection, SystemdSta
     let conn = Connection::new().context("could not create connection")?;
     let notifications = notifications::create_notifications(config)
         .context("could not create notifications provider")?;
-    let systemd = SystemdStateImpl::new();
+    let systemd = SystemdStateImpl::new(Path::new(&config.state_file_path).to_path_buf());
     Ok(AppState {
         filter,
         conn,

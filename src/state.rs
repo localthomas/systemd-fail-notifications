@@ -4,7 +4,7 @@ SPDX-FileCopyrightText: 2021 localthomas
 SPDX-License-Identifier: MIT OR Apache-2.0
 */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use crate::status::UnitStatus;
 
@@ -16,13 +16,28 @@ pub trait SystemdState {
 }
 
 pub struct SystemdStateImpl {
+    state_file_path: PathBuf,
     systemd_state: HashMap<String, UnitStatus>,
 }
 
 impl SystemdStateImpl {
-    pub fn new() -> Self {
+    pub fn new(state_file_path: PathBuf) -> Self {
+        // read state from disk
+        let systemd_state = {
+            if let Ok(data) = fs::read(&state_file_path) {
+                if let Ok(deserialized) = serde_json::from_slice(&data) {
+                    deserialized
+                } else {
+                    HashMap::new()
+                }
+            } else {
+                HashMap::new()
+            }
+        };
+
         Self {
-            systemd_state: HashMap::new(),
+            state_file_path,
+            systemd_state,
         }
     }
 }
@@ -61,6 +76,23 @@ impl<'a> SystemdState for SystemdStateImpl {
                 });
             }
         }
+
+        // save new state to disk
+        let serialized_state =
+            serde_json::to_string(&self.systemd_state).expect("could not serialize systemd state");
+        let state_file_dir_path = self
+            .state_file_path
+            .parent()
+            .expect("could not get parent dir of state_file_path");
+        fs::create_dir_all(state_file_dir_path).expect(&format!(
+            "could not create directories for the state file ({:?})",
+            state_file_dir_path
+        ));
+        fs::write(&self.state_file_path, serialized_state).expect(&format!(
+            "could not write systemd state to file ({:?})",
+            self.state_file_path
+        ));
+
         changes
     }
 }
@@ -68,6 +100,17 @@ impl<'a> SystemdState for SystemdStateImpl {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    fn temp_file_path() -> PathBuf {
+        let mut dir = std::env::temp_dir();
+        let file_name: String =
+            rand::Rng::sample_iter(rand::thread_rng(), &rand::distributions::Alphanumeric)
+                .take(16)
+                .map(char::from)
+                .collect();
+        dir.push(file_name);
+        dir
+    }
 
     pub struct MockupSystemdState {
         pub last_state: Option<Vec<UnitStatus>>,
@@ -95,7 +138,7 @@ pub mod tests {
 
     #[test]
     fn on_state_changed_not_called_for_empty_new_state() {
-        let mut state = SystemdStateImpl::new();
+        let mut state = SystemdStateImpl::new(temp_file_path());
         let changes = state.apply_new_status(vec![]);
         assert_eq!(changes, vec![]);
     }
@@ -110,7 +153,7 @@ pub mod tests {
             sub_state: String::from("test"),
             following_unit: String::from("test"),
         });
-        let mut state = SystemdStateImpl::new();
+        let mut state = SystemdStateImpl::new(temp_file_path());
         assert_eq!(
             state.apply_new_status(vec![test_status.clone()]),
             vec![ChangedUnitStatus {
@@ -130,7 +173,7 @@ pub mod tests {
             sub_state: String::from("test"),
             following_unit: String::from("test"),
         });
-        let mut state = SystemdStateImpl::new();
+        let mut state = SystemdStateImpl::new(temp_file_path());
         assert_eq!(state.apply_new_status(vec![]), vec![]);
         assert_eq!(
             state.apply_new_status(vec![test_status.clone()]),
@@ -151,7 +194,7 @@ pub mod tests {
             sub_state: String::from("test"),
             following_unit: String::from("test"),
         });
-        let mut state = SystemdStateImpl::new();
+        let mut state = SystemdStateImpl::new(temp_file_path());
         assert_eq!(
             state.apply_new_status(vec![test_status.clone()]),
             vec![ChangedUnitStatus {
@@ -181,7 +224,7 @@ pub mod tests {
             sub_state: String::from("test"),
             following_unit: String::from("test"),
         });
-        let mut state = SystemdStateImpl::new();
+        let mut state = SystemdStateImpl::new(temp_file_path());
         assert_eq!(
             state.apply_new_status(vec![test_status_old.clone()]),
             vec![ChangedUnitStatus {

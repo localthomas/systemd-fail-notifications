@@ -4,6 +4,8 @@ SPDX-FileCopyrightText: 2021 localthomas
 SPDX-License-Identifier: MIT OR Apache-2.0
 */
 
+use serde::{Deserialize, Serialize};
+
 use crate::dbus_systemd::dbus::UnitStatusRaw;
 use std::str::FromStr;
 
@@ -11,7 +13,7 @@ use std::str::FromStr;
 /// Does not return an error on parsing, but instead implements a variant `Unknown`.
 macro_rules! string_enum {
     ($name:ident { $(($item:ident, $repr:expr),)* }) => {
-        #[derive(Debug,  Clone, Eq, PartialEq, Hash)]
+        #[derive(Debug,  Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
         pub enum $name {
             $(
                 $item,
@@ -65,7 +67,7 @@ string_enum! {
     }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+#[derive(Debug, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub struct UnitStatus {
     name: String,
     description: String,

@@ -1143,6 +1143,7 @@ dependencies = [
  "anyhow",
  "clap",
  "gethostname",
+ "rand",
  "serde",
  "serde_json",
  "signal-hook",

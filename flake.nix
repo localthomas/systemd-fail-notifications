@@ -79,7 +79,7 @@
             config = {
               # Note that the entrypoint is *not* "${self.packages.${system}.${crateName}}/bin/${crateName}"
               Entrypoint = [ "./bin/${crateName}" ];
-              Volumes = { "/events.json" = { }; };
+              Volumes = { "/var/lib/systemd-fail-notifications" = { }; };
               Labels = {
                 # Optional annotations for OCI images (https://github.com/opencontainers/image-spec/blob/main/annotations.md)
                 "org.opencontainers.image.title" = cargo-metadata.package.name;

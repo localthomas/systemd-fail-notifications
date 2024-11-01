@@ -10,6 +10,7 @@ use anyhow::Result;
 /// Can be used to alter the behavior of the execution or to configure notification provider.
 pub struct Config {
     pub discord_webhook_url: Option<String>,
+    pub state_file_path: String,
     pub about: bool,
     pub disable_start_notification: bool,
 }
@@ -30,6 +31,11 @@ impl Config {
             "discord-webhook-url",
             "SYSTEMD_FAIL_NOTIFICATIONS_DISCORD_WEBHOOK_URL",
             "the webhook-URL of the Discord webhook like 'https://discord.com/api/webhooks/<id>/<token>'",
+        );
+        const STATE_FILE_PATH: (&str, &str, &str) = (
+            "state-file-path",
+            "SYSTEMD_FAIL_NOTIFICATIONS_STATE_FILE_PATH",
+            "the path to a file were the state can be stored",
         );
         use clap::{Arg, Command};
         let matches = Command::new(env!("CARGO_PKG_NAME"))
@@ -55,10 +61,22 @@ impl Config {
                     .help(DISCORD_WEBHOOK_URL.2)
                     .takes_value(true),
             )
+            .arg(
+                Arg::new(STATE_FILE_PATH.0)
+                    .long(STATE_FILE_PATH.0)
+                    .env(STATE_FILE_PATH.1)
+                    .help(STATE_FILE_PATH.2)
+                    .default_value("/var/lib/systemd-fail-notifications/state.json")
+                    .takes_value(true),
+            )
             .get_matches();
 
         Ok(Self {
             discord_webhook_url: option_str_to_string(matches.value_of(DISCORD_WEBHOOK_URL.0)),
+            state_file_path: matches
+                .value_of(STATE_FILE_PATH.0)
+                .expect("illegal state: no default value present for STATE_FILE_PATH")
+                .to_string(),
             about: matches.is_present(ABOUT.0),
             disable_start_notification: matches.is_present(DISABLE_START_NOTIFICATION.0),
         })

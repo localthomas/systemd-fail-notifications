@@ -257,7 +257,7 @@ fn looping<T: FnMut() -> Result<()>>(
         let start = time::Instant::now();
         function()?;
         // measure time and then sleep exact so long that the interval is met
-        thread::sleep(interval - start.elapsed());
+        thread::sleep(interval.saturating_sub(start.elapsed()));
     }
     Ok(())
 }

@@ -1,4 +1,12 @@
-accepted = ["Apache-2.0", "MIT", "ISC", "BSD-3-Clause", "MPL-2.0", "OpenSSL"]
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "ISC",
+    "BSD-3-Clause",
+    "MPL-2.0",
+    "OpenSSL",
+    "Unicode-3.0",
+]
 # there is a detection issue with the ring library,
 # which is fixed by activating this workaround
 workarounds = ["ring"]
